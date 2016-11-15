@@ -291,61 +291,6 @@ MEASAirspeedSim::cycle()
 void
 MEASAirspeedSim::voltage_correction(float &diff_press_pa, float &temperature)
 {
-#if defined(CONFIG_ARCH_BOARD_PX4FMU_V2) || defined(CONFIG_ARCH_BOARD_PX4FMU_V4)
-
-	if (_t_system_power == -1) {
-		_t_system_power = orb_subscribe(ORB_ID(system_power));
-	}
-
-	if (_t_system_power == -1) {
-		// not available
-		return;
-	}
-
-	bool updated = false;
-	orb_check(_t_system_power, &updated);
-
-	if (updated) {
-		orb_copy(ORB_ID(system_power), _t_system_power, &system_power);
-	}
-
-	if (system_power.voltage5V_v < 3.0f || system_power.voltage5V_v > 6.0f) {
-		// not valid, skip correction
-		return;
-	}
-
-	const float slope = 65.0f;
-	/*
-	  apply a piecewise linear correction, flattening at 0.5V from 5V
-	 */
-	float voltage_diff = system_power.voltage5V_v - 5.0f;
-
-	if (voltage_diff > 0.5f) {
-		voltage_diff = 0.5f;
-	}
-
-	if (voltage_diff < -0.5f) {
-		voltage_diff = -0.5f;
-	}
-
-	diff_press_pa -= voltage_diff * slope;
-
-	/*
-	  the temperature masurement varies as well
-	 */
-	const float temp_slope = 0.887f;
-	voltage_diff = system_power.voltage5V_v - 5.0f;
-
-	if (voltage_diff > 0.5f) {
-		voltage_diff = 0.5f;
-	}
-
-	if (voltage_diff < -1.0f) {
-		voltage_diff = -1.0f;
-	}
-
-	temperature -= voltage_diff * temp_slope;
-#endif // CONFIG_ARCH_BOARD_PX4FMU_V2
 }
 
 /**
@@ -547,6 +492,7 @@ info()
 {
 	if (g_dev == nullptr) {
 		PX4_WARN("driver not running");
+		return -1;
 	}
 
 	printf("state @ %p\n", g_dev);
@@ -561,7 +507,7 @@ info()
 static void
 meas_airspeed_usage()
 {
-	PX4_WARN("usage: meas_airspeed_sim command [options]");
+	PX4_WARN("usage: measairspeedsim command [options]");
 	PX4_WARN("options:");
 	PX4_WARN("\t-b --bus i2cbus (%d)", 1);
 	PX4_WARN("command:");
@@ -583,41 +529,41 @@ measairspeedsim_main(int argc, char *argv[])
 		}
 	}
 
-	int ret = 0;
+	int ret = 1;
 
 	/*
 	 * Start/load the driver.
 	 */
 	if (!strcmp(argv[1], "start")) {
-		ret = meas_airspeed_sim::start(i2c_bus);
+		return meas_airspeed_sim::start(i2c_bus);
 	}
 
 	/*
 	 * Stop the driver
 	 */
 	if (!strcmp(argv[1], "stop")) {
-		ret = meas_airspeed_sim::stop();
+		return meas_airspeed_sim::stop();
 	}
 
 	/*
 	 * Test the driver/device.
 	 */
 	if (!strcmp(argv[1], "test")) {
-		ret = meas_airspeed_sim::test();
+		return meas_airspeed_sim::test();
 	}
 
 	/*
 	 * Reset the driver.
 	 */
 	if (!strcmp(argv[1], "reset")) {
-		ret = meas_airspeed_sim::reset();
+		return meas_airspeed_sim::reset();
 	}
 
 	/*
 	 * Print driver information.
 	 */
 	if (!strcmp(argv[1], "info") || !strcmp(argv[1], "status")) {
-		ret = meas_airspeed_sim::info();
+		return meas_airspeed_sim::info();
 	}
 
 	meas_airspeed_usage();

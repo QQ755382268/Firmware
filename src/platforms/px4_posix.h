@@ -44,7 +44,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <poll.h>
-#include <semaphore.h>
+#include <stdint.h>
 
 #if defined(__PX4_QURT)
 #include <dspal_types.h>
@@ -52,50 +52,8 @@
 #include <sys/types.h>
 #endif
 
-/* Semaphore handling */
+#include "px4_sem.h"
 
-#ifdef __PX4_DARWIN
-
-__BEGIN_DECLS
-
-typedef struct {
-	pthread_mutex_t lock;
-	pthread_cond_t wait;
-	int value;
-} px4_sem_t;
-
-__EXPORT int		px4_sem_init(px4_sem_t *s, int pshared, unsigned value);
-__EXPORT int		px4_sem_wait(px4_sem_t *s);
-__EXPORT int		px4_sem_timedwait(px4_sem_t *sem, const struct timespec *abstime);
-__EXPORT int		px4_sem_post(px4_sem_t *s);
-__EXPORT int		px4_sem_getvalue(px4_sem_t *s, int *sval);
-__EXPORT int		px4_sem_destroy(px4_sem_t *s);
-
-__END_DECLS
-
-#else
-
-__BEGIN_DECLS
-
-typedef sem_t px4_sem_t;
-
-#define px4_sem_init	 sem_init
-#define px4_sem_wait	 sem_wait
-#define px4_sem_post	 sem_post
-#define px4_sem_getvalue sem_getvalue
-#define px4_sem_destroy	 sem_destroy
-
-#ifdef __PX4_QURT
-__EXPORT int		px4_sem_timedwait(px4_sem_t *sem, const struct timespec *abstime);
-#else
-#define px4_sem_timedwait	 sem_timedwait
-#endif
-
-__END_DECLS
-
-#endif
-
-//###################################
 
 #ifdef __PX4_NUTTX
 
@@ -119,11 +77,14 @@ typedef struct pollfd px4_pollfd_struct_t;
 #define px4_access 	_GLOBAL access
 #define px4_getpid 	_GLOBAL getpid
 
+#define  PX4_STACK_OVERHEAD	0
+
 #elif defined(__PX4_POSIX)
 
 #define  PX4_F_RDONLY O_RDONLY
 #define  PX4_F_WRONLY O_WRONLY
 #define  PX4_F_CREAT  O_CREAT
+#define	 PX4_STACK_OVERHEAD	8192
 
 typedef short pollevent_t;
 
@@ -148,7 +109,7 @@ __EXPORT int		px4_ioctl(int fd, int cmd, unsigned long arg);
 __EXPORT int		px4_poll(px4_pollfd_struct_t *fds, nfds_t nfds, int timeout);
 __EXPORT int		px4_fsync(int fd);
 __EXPORT int		px4_access(const char *pathname, int mode);
-__EXPORT unsigned long	px4_getpid(void);
+__EXPORT px4_task_t	px4_getpid(void);
 
 __EXPORT void		px4_enable_sim_lockstep(void);
 __EXPORT void		px4_sim_start_delay(void);
@@ -160,6 +121,13 @@ __END_DECLS
 #error "No TARGET OS Provided"
 #endif
 
+
+// The stack size is intended for 32-bit architectures; therefore
+// we often run out of stack space when pointers are larger than 4 bytes.
+// Double the stack size on posix when we're on a 64-bit architecture.
+// Most full-scale OS use 1-4K of memory from the stack themselves
+#define PX4_STACK_ADJUSTED(_s) (_s * (__SIZEOF_POINTER__ >> 2) + PX4_STACK_OVERHEAD)
+
 __BEGIN_DECLS
 extern int px4_errno;
 
@@ -169,4 +137,14 @@ __EXPORT const char 	*px4_get_device_names(unsigned int *handle);
 
 __EXPORT void		px4_show_topics(void);
 __EXPORT const char 	*px4_get_topic_names(unsigned int *handle);
+
+#ifndef __PX4_QURT
+/*
+ * The UNIX epoch system time following the system clock
+ */
+__EXPORT uint64_t	hrt_system_time(void);
+
+__EXPORT bool		px4_exit_requested(void);
+#endif
+
 __END_DECLS

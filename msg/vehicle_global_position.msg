@@ -4,7 +4,6 @@
 # estimator, which will take more sources of information into account than just GPS,
 # e.g. control inputs of the vehicle in a Kalman-filter implementation.
 #
-uint64 timestamp		# Time of this estimate since system start, (microseconds)
 uint64 time_utc_usec		# GPS UTC timestamp, (microseconds)
 float64 lat			# Latitude, (degrees)
 float64 lon			# Longitude, (degrees)
@@ -19,3 +18,5 @@ float32 terrain_alt		# Terrain altitude WGS84, (metres)
 bool terrain_alt_valid		# Terrain altitude estimate is valid
 bool dead_reckoning		# True if this position is estimated through dead-reckoning
 float32 pressure_alt		# Pressure altitude AMSL, (metres)
+
+# TOPICS vehicle_global_position vehicle_global_position_groundtruth

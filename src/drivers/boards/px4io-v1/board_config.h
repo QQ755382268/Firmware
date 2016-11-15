@@ -47,7 +47,6 @@
 #include <nuttx/compiler.h>
 #include <stdint.h>
 
-/* these headers are not C++ safe */
 #include <stm32.h>
 #include <arch/board/board.h>
 
@@ -84,11 +83,11 @@
 #define GPIO_RELAY2_EN (GPIO_OUTPUT|GPIO_CNF_OUTPP|GPIO_MODE_50MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTA|GPIO_PIN11)
 
 #define GPIO_SPEKTRUM_PWR_EN GPIO_RELAY1_EN
-#define POWER_SPEKTRUM(_s)		stm32_gpiowrite(GPIO_RELAY1_EN, (_s))
+#define POWER_SPEKTRUM(_s)		px4_arch_gpiowrite(GPIO_RELAY1_EN, (_s))
 
-#define SPEKTRUM_RX_HIGH(_s)	stm32_gpiowrite(GPIO_USART1_RX_SPEKTRUM, (_s))
-#define SPEKTRUM_RX_AS_UART()		stm32_configgpio(GPIO_USART1_RX)
-#define SPEKTRUM_RX_AS_GPIO()		stm32_configgpio(GPIO_USART1_RX_SPEKTRUM)
+#define SPEKTRUM_RX_HIGH(_s)	px4_arch_gpiowrite(GPIO_USART1_RX_SPEKTRUM, (_s))
+#define SPEKTRUM_RX_AS_UART()		px4_arch_configgpio(GPIO_USART1_RX)
+#define SPEKTRUM_RX_AS_GPIO()		px4_arch_configgpio(GPIO_USART1_RX_SPEKTRUM)
 
 /* Analog inputs ********************************************************************/
 

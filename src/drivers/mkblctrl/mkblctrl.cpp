@@ -75,7 +75,6 @@
 #include <systemlib/mixer/mixer.h>
 
 #include <uORB/topics/actuator_controls.h>
-#include <uORB/topics/actuator_controls_0.h>
 #include <uORB/topics/actuator_outputs.h>
 #include <uORB/topics/actuator_armed.h>
 #include <uORB/topics/esc_status.h>
@@ -546,7 +545,7 @@ MK::task_main()
 					for (unsigned int i = 0; i < _num_outputs; i++) {
 						/* last resort: catch NaN, INF and out-of-band errors */
 						if (i < outputs.noutputs &&
-						    isfinite(outputs.output[i]) &&
+						    PX4_ISFINITE(outputs.output[i]) &&
 						    outputs.output[i] >= -1.0f &&
 						    outputs.output[i] <= 1.0f) {
 							/* scale for PWM output 900 - 2100us */

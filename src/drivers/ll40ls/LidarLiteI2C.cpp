@@ -40,6 +40,7 @@
  */
 
 #include "LidarLiteI2C.h"
+#include <px4_defines.h>
 #include <semaphore.h>
 #include <fcntl.h>
 #include <errno.h>
@@ -47,12 +48,6 @@
 #include <string.h>
 #include <stdio.h>
 #include <drivers/drv_hrt.h>
-
-/* oddly, ERROR is not defined for c++ */
-#ifdef ERROR
-# undef ERROR
-#endif
-static const int ERROR = -1;
 
 LidarLiteI2C::LidarLiteI2C(int bus, const char *path, int address) :
 	I2C("LL40LS", path, bus, address, 100000),
@@ -110,7 +105,7 @@ LidarLiteI2C::~LidarLiteI2C()
 
 int LidarLiteI2C::init()
 {
-	int ret = ERROR;
+	int ret = PX4_ERROR;
 
 	/* do I2C init (and probe) first */
 	if (I2C::init() != OK) {
@@ -216,14 +211,14 @@ int LidarLiteI2C::ioctl(struct file *filp, int cmd, unsigned long arg)
 				return -EINVAL;
 			}
 
-			irqstate_t flags = irqsave();
+			irqstate_t flags = px4_enter_critical_section();
 
 			if (!_reports->resize(arg)) {
-				irqrestore(flags);
+				px4_leave_critical_section(flags);
 				return -ENOMEM;
 			}
 
-			irqrestore(flags);
+			px4_leave_critical_section(flags);
 
 			return OK;
 		}

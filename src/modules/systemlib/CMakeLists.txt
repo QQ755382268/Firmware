@@ -32,7 +32,7 @@
 ############################################################################
 
 # for generated files
-include_directories(${CMAKE_BINARY_DIR}/src/modules/param)
+include_directories(${PX4_BINARY_DIR}/src/modules/param)
 
 set(SRCS
 	perf_counter.c
@@ -48,6 +48,8 @@ set(SRCS
 	mcu_version.c
 	bson/tinybson.c
 	circuit_breaker.cpp
+	battery.cpp
+	hysteresis/hysteresis.cpp
 	)
 
 if(${OS} STREQUAL "nuttx")
@@ -55,7 +57,9 @@ if(${OS} STREQUAL "nuttx")
 		err.c
 		printload.c
 		param/param.c
-		up_cxxinitialize.c 
+		flashparams/flashparams.c
+		flashparams/flashfs.c
+		up_cxxinitialize.c
 		)
 elseif ("${CONFIG_SHMEM}" STREQUAL "1")
 	list(APPEND SRCS
@@ -66,7 +70,7 @@ else()
 	list(APPEND SRCS
 		param/param.c
 		print_load_posix.c
-		)	
+		)
 endif()
 
 if(NOT ${OS} STREQUAL "qurt")
@@ -79,10 +83,9 @@ px4_add_module(
 	MODULE modules__systemlib
 	COMPILE_FLAGS
 		-Wno-sign-compare
-		-Os
 	SRCS ${SRCS}
 	DEPENDS
 		platforms__common
 		modules__param
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix : 
+# vim: set noet ft=cmake fenc=utf-8 ff=unix :

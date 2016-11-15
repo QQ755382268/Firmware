@@ -47,7 +47,7 @@
 #include <px4_time.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
+#include <string>
 #include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
@@ -55,6 +55,9 @@
 #include <poll.h>
 #include <time.h>
 #include <float.h>
+#include <iostream>
+#include <fstream>
+#include <sstream>
 
 #include <uORB/topics/ekf2_replay.h>
 #include <uORB/topics/sensor_combined.h>
@@ -63,9 +66,11 @@
 #include <uORB/topics/ekf2_innovations.h>
 #include <uORB/topics/estimator_status.h>
 #include <uORB/topics/control_state.h>
-#include <uORB/topics/vehicle_status.h>
+#include <uORB/topics/vehicle_land_detected.h>
 #include <uORB/topics/optical_flow.h>
 #include <uORB/topics/distance_sensor.h>
+#include <uORB/topics/airspeed.h>
+#include <uORB/topics/vision_position_estimate.h>
 
 #include <sdlog2/sdlog2_messages.h>
 
@@ -127,9 +132,12 @@ private:
 
 	orb_advert_t _sensors_pub;
 	orb_advert_t _gps_pub;
-	orb_advert_t _status_pub;
+	orb_advert_t _landed_pub;
 	orb_advert_t _flow_pub;
 	orb_advert_t _range_pub;
+	orb_advert_t _airspeed_pub;
+	orb_advert_t _ev_pub;
+	orb_advert_t _vehicle_status_pub;
 
 	int _att_sub;
 	int _estimator_status_sub;
@@ -142,15 +150,27 @@ private:
 	struct log_format_s _formats[100];
 	struct sensor_combined_s _sensors;
 	struct vehicle_gps_position_s _gps;
-	struct vehicle_status_s _status;
+	struct vehicle_land_detected_s _land_detected;
 	struct optical_flow_s _flow;
 	struct distance_sensor_s _range;
+	struct airspeed_s _airspeed;
+	struct vision_position_estimate_s _ev;
+	struct vehicle_status_s _vehicle_status;
+
+	uint32_t _numInnovSamples;	// number of samples used to calculate the RMS innovation values
+	float _velInnovSumSq;		// GPS velocity innovation sum of squares
+	float _posInnovSumSq;		// GPS position innovation sum of squares
+	float _hgtInnovSumSq;		// Vertical position innovation sum of squares
+	float _magInnovSumSq;		// magnetometer innovation sum of squares
+	float _tasInnovSumSq;		// airspeed innovation sum of squares
 
 	unsigned _message_counter; // counter which will increase with every message read from the log
 	unsigned _part1_counter_ref;		// this is the value of _message_counter when the part1 of the replay message is read (imu data)
 	bool _read_part2;				// indicates if part 2 of replay message has been read
 	bool _read_part3;
 	bool _read_part4;
+	bool _read_part6;
+	bool _read_part5;
 
 	int _write_fd = -1;
 	px4_pollfd_struct_t _fds[1];
@@ -188,14 +208,19 @@ private:
 	// it will then wait for the output data from the estimator and call the propoper
 	// functions to handle it
 	void publishAndWaitForEstimator();
+
+	void setUserParams(const char *filename);
 };
 
 Ekf2Replay::Ekf2Replay(char *logfile) :
 	_sensors_pub(nullptr),
 	_gps_pub(nullptr),
-	_status_pub(nullptr),
+	_landed_pub(nullptr),
 	_flow_pub(nullptr),
 	_range_pub(nullptr),
+	_airspeed_pub(nullptr),
+	_ev_pub(nullptr),
+	_vehicle_status_pub(nullptr),
 	_att_sub(-1),
 	_estimator_status_sub(-1),
 	_innov_sub(-1),
@@ -204,14 +229,24 @@ Ekf2Replay::Ekf2Replay(char *logfile) :
 	_formats{},
 	_sensors{},
 	_gps{},
-	_status{},
+	_land_detected{},
 	_flow{},
 	_range{},
+	_airspeed{},
+	_vehicle_status{},
+	_numInnovSamples(0),
+	_velInnovSumSq(0.0f),
+	_posInnovSumSq(0.0f),
+	_hgtInnovSumSq(0.0f),
+	_magInnovSumSq(0.0f),
+	_tasInnovSumSq(0.0f),
 	_message_counter(0),
 	_part1_counter_ref(0),
 	_read_part2(false),
 	_read_part3(false),
 	_read_part4(false),
+	_read_part6(false),
+	_read_part5(false),
 	_write_fd(-1)
 {
 	// build the path to the log
@@ -222,7 +257,7 @@ Ekf2Replay::Ekf2Replay(char *logfile) :
 	_file_name = path_to_log;
 
 	// we always start landed
-	_status.condition_landed = true;
+	_land_detected.landed = true;
 }
 
 Ekf2Replay::~Ekf2Replay()
@@ -259,12 +294,30 @@ void Ekf2Replay::publishEstimatorInput()
 
 	_read_part4 = false;
 
+	if (_ev_pub == nullptr && _read_part5) {
+		_ev_pub = orb_advertise(ORB_ID(vision_position_estimate), &_ev);
+
+	} else if (_ev_pub != nullptr && _read_part5) {
+		orb_publish(ORB_ID(vision_position_estimate), _ev_pub, &_ev);
+	}
+
+	_read_part5 = false;
+
 	if (_sensors_pub == nullptr) {
 		_sensors_pub = orb_advertise(ORB_ID(sensor_combined), &_sensors);
 
 	} else if (_sensors_pub != nullptr) {
 		orb_publish(ORB_ID(sensor_combined), _sensors_pub, &_sensors);
 	}
+
+	if (_airspeed_pub == nullptr && _read_part6) {
+		_airspeed_pub = orb_advertise(ORB_ID(airspeed), &_airspeed);
+
+	} else if (_airspeed_pub != nullptr) {
+		orb_publish(ORB_ID(airspeed), _airspeed_pub, &_airspeed);
+	}
+
+	_read_part6 = false;
 }
 
 void Ekf2Replay::parseMessage(uint8_t *source, uint8_t *destination, uint8_t type)
@@ -327,6 +380,9 @@ void Ekf2Replay::setEstimatorInput(uint8_t *data, uint8_t type)
 	struct log_RPL2_s replay_part2 = {};
 	struct log_RPL3_s replay_part3 = {};
 	struct log_RPL4_s replay_part4 = {};
+	struct log_RPL6_s replay_part6 = {};
+	struct log_RPL5_s replay_part5 = {};
+	struct log_LAND_s vehicle_landed = {};
 	struct log_STAT_s vehicle_status = {};
 
 	if (type == LOG_RPL1_MSG) {
@@ -334,27 +390,41 @@ void Ekf2Replay::setEstimatorInput(uint8_t *data, uint8_t type)
 		uint8_t *dest_ptr = (uint8_t *)&replay_part1.time_ref;
 		parseMessage(data, dest_ptr, type);
 		_sensors.timestamp = replay_part1.time_ref;
-		_sensors.gyro_integral_dt[0] = replay_part1.gyro_integral_dt;
-		_sensors.accelerometer_integral_dt[0] = replay_part1.accelerometer_integral_dt;
-		_sensors.magnetometer_timestamp[0] = replay_part1.magnetometer_timestamp;
-		_sensors.baro_timestamp[0] = replay_part1.baro_timestamp;
-		_sensors.gyro_integral_rad[0] = replay_part1.gyro_integral_x_rad;
-		_sensors.gyro_integral_rad[1] = replay_part1.gyro_integral_y_rad;
-		_sensors.gyro_integral_rad[2] = replay_part1.gyro_integral_z_rad;
-		_sensors.accelerometer_integral_m_s[0] = replay_part1.accelerometer_integral_x_m_s;
-		_sensors.accelerometer_integral_m_s[1] = replay_part1.accelerometer_integral_y_m_s;
-		_sensors.accelerometer_integral_m_s[2] = replay_part1.accelerometer_integral_z_m_s;
+		_sensors.gyro_integral_dt = replay_part1.gyro_integral_dt;
+		_sensors.accelerometer_integral_dt = replay_part1.accelerometer_integral_dt;
+
+		// If the magnetometer timestamp is zero, then there is no valid data
+		if (replay_part1.magnetometer_timestamp == 0) {
+			_sensors.magnetometer_timestamp_relative = (int32_t)sensor_combined_s::RELATIVE_TIMESTAMP_INVALID;
+
+		} else {
+			_sensors.magnetometer_timestamp_relative = (int32_t)(replay_part1.magnetometer_timestamp - _sensors.timestamp);
+		}
+
+		// If the barometer timestamp is zero then there is no valid data
+		if (replay_part1.baro_timestamp == 0) {
+			_sensors.baro_timestamp_relative = (int32_t)sensor_combined_s::RELATIVE_TIMESTAMP_INVALID;
+
+		} else {
+			_sensors.baro_timestamp_relative = (int32_t)(replay_part1.baro_timestamp - _sensors.timestamp);
+		}
+
+		_sensors.gyro_rad[0] = replay_part1.gyro_x_rad;
+		_sensors.gyro_rad[1] = replay_part1.gyro_y_rad;
+		_sensors.gyro_rad[2] = replay_part1.gyro_z_rad;
+		_sensors.accelerometer_m_s2[0] = replay_part1.accelerometer_x_m_s2;
+		_sensors.accelerometer_m_s2[1] = replay_part1.accelerometer_y_m_s2;
+		_sensors.accelerometer_m_s2[2] = replay_part1.accelerometer_z_m_s2;
 		_sensors.magnetometer_ga[0] = replay_part1.magnetometer_x_ga;
 		_sensors.magnetometer_ga[1] = replay_part1.magnetometer_y_ga;
 		_sensors.magnetometer_ga[2] = replay_part1.magnetometer_z_ga;
-		_sensors.baro_alt_meter[0] = replay_part1.baro_alt_meter;
+		_sensors.baro_alt_meter = replay_part1.baro_alt_meter;
 		_part1_counter_ref = _message_counter;
 
 	} else if (type == LOG_RPL2_MSG) {
 		uint8_t *dest_ptr = (uint8_t *)&replay_part2.time_pos_usec;
 		parseMessage(data, dest_ptr, type);
-		_gps.timestamp_position = replay_part2.time_pos_usec;
-		_gps.timestamp_velocity = replay_part2.time_vel_usec;
+		_gps.timestamp = replay_part2.time_pos_usec;
 		_gps.lat = replay_part2.lat;
 		_gps.lon = replay_part2.lon;
 		_gps.fix_type = replay_part2.fix_type;
@@ -367,6 +437,7 @@ void Ekf2Replay::setEstimatorInput(uint8_t *data, uint8_t type)
 		_gps.vel_e_m_s = replay_part2.vel_e_m_s;
 		_gps.vel_d_m_s = replay_part2.vel_d_m_s;
 		_gps.vel_ned_valid = replay_part2.vel_ned_valid;
+		_gps.alt = replay_part2.alt;
 		_read_part2 = true;
 
 	} else if (type == LOG_RPL3_MSG) {
@@ -386,19 +457,59 @@ void Ekf2Replay::setEstimatorInput(uint8_t *data, uint8_t type)
 		parseMessage(data, dest_ptr, type);
 		_range.timestamp = replay_part4.time_rng_usec;
 		_range.current_distance = replay_part4.range_to_ground;
+		_range.covariance = 0.0f;
+		// magic values
+		_range.min_distance = 0.05f;
+		_range.max_distance = 30.0f;
 		_read_part4 = true;
 
-	} else if (type == LOG_STAT_MSG) {
+	} else if (type == LOG_RPL6_MSG) {
+		uint8_t *dest_ptr = (uint8_t *)&replay_part6.time_airs_usec;
+		parseMessage(data, dest_ptr, type);
+		_airspeed.timestamp = replay_part6.time_airs_usec;
+		_airspeed.indicated_airspeed_m_s = replay_part6.indicated_airspeed_m_s;
+		_airspeed.true_airspeed_m_s = replay_part6.true_airspeed_m_s;
+		_read_part6 = true;
+
+	} else if (type == LOG_RPL5_MSG) {
+		uint8_t *dest_ptr = (uint8_t *)&replay_part5.time_ev_usec;
+		parseMessage(data, dest_ptr, type);
+		_ev.timestamp = replay_part5.time_ev_usec;
+		_ev.timestamp_received = replay_part5.time_ev_usec; // fake this timestamp
+		_ev.x = replay_part5.x;
+		_ev.y = replay_part5.y;
+		_ev.z = replay_part5.z;
+		_ev.q[0] = replay_part5.q0;
+		_ev.q[1] = replay_part5.q1;
+		_ev.q[2] = replay_part5.q2;
+		_ev.q[3] = replay_part5.q3;
+		_ev.pos_err = replay_part5.pos_err;
+		_ev.ang_err = replay_part5.pos_err;
+		_read_part5 = true;
+
+	} else if (type == LOG_LAND_MSG) {
+		uint8_t *dest_ptr = (uint8_t *)&vehicle_landed.landed;
+		parseMessage(data, dest_ptr, type);
+		_land_detected.landed =  vehicle_landed.landed;
+
+		if (_landed_pub == nullptr) {
+			_landed_pub = orb_advertise(ORB_ID(vehicle_land_detected), &_land_detected);
+
+		} else if (_landed_pub != nullptr) {
+			orb_publish(ORB_ID(vehicle_land_detected), _landed_pub, &_land_detected);
+		}
+	}
+
+	else if (type == LOG_STAT_MSG) {
 		uint8_t *dest_ptr = (uint8_t *)&vehicle_status.main_state;
 		parseMessage(data, dest_ptr, type);
-		_status.arming_state = vehicle_status.arming_state;
-		_status.condition_landed = (bool)vehicle_status.landed;
+		_vehicle_status.is_rotary_wing = vehicle_status.is_rot_wing;
 
-		if (_status_pub == nullptr) {
-			_status_pub = orb_advertise(ORB_ID(vehicle_status), &_status);
+		if (_vehicle_status_pub == nullptr) {
+			_vehicle_status_pub = orb_advertise(ORB_ID(vehicle_status), &_vehicle_status);
 
-		} else if (_status_pub != nullptr) {
-			orb_publish(ORB_ID(vehicle_status), _status_pub, &_status);
+		} else if (_vehicle_status_pub != nullptr) {
+			orb_publish(ORB_ID(vehicle_status), _vehicle_status_pub, &_vehicle_status);
 		}
 	}
 }
@@ -436,6 +547,13 @@ void Ekf2Replay::logIfUpdated()
 	// update attitude
 	struct vehicle_attitude_s att = {};
 	orb_copy(ORB_ID(vehicle_attitude), _att_sub, &att);
+
+	// if the timestamp of the attitude is zero, then this means that the ekf did not
+	// do an update so we can ignore this message and just continue
+	if (att.timestamp == 0) {
+		return;
+	}
+
 	memset(&log_message.body.att.q_w, 0, sizeof(log_ATT_s));
 
 	log_message.type = LOG_ATT_MSG;
@@ -445,15 +563,14 @@ void Ekf2Replay::logIfUpdated()
 	log_message.body.att.q_x = att.q[1];
 	log_message.body.att.q_y = att.q[2];
 	log_message.body.att.q_z = att.q[3];
-	log_message.body.att.roll = att.roll;
-	log_message.body.att.pitch = att.pitch;
-	log_message.body.att.yaw = att.yaw;
+	log_message.body.att.roll = atan2f(2 * (att.q[0] * att.q[1] + att.q[2] * att.q[3]),
+					   1 - 2 * (att.q[1] * att.q[1] + att.q[2] * att.q[2]));
+	log_message.body.att.pitch = asinf(2 * (att.q[0] * att.q[2] - att.q[3] * att.q[1]));
+	log_message.body.att.yaw = atan2f(2 * (att.q[0] * att.q[3] + att.q[1] * att.q[2]),
+					  1 - 2 * (att.q[2] * att.q[2] + att.q[3] * att.q[3]));
 	log_message.body.att.roll_rate = att.rollspeed;
 	log_message.body.att.pitch_rate = att.pitchspeed;
 	log_message.body.att.yaw_rate = att.yawspeed;
-	log_message.body.att.gx = att.g_comp[0];
-	log_message.body.att.gy = att.g_comp[1];
-	log_message.body.att.gz = att.g_comp[2];
 
 	writeMessage(_write_fd, (void *)&log_message.head1, _formats[LOG_ATT_MSG].length);
 
@@ -506,7 +623,7 @@ void Ekf2Replay::logIfUpdated()
 		memcpy(&(log_message.body.est0.s), est_status.states, maxcopy0);
 		log_message.body.est0.n_states = est_status.n_states;
 		log_message.body.est0.nan_flags = est_status.nan_flags;
-		log_message.body.est0.health_flags = est_status.health_flags;
+		log_message.body.est0.fault_flags = est_status.filter_fault_flags;
 		log_message.body.est0.timeout_flags = est_status.timeout_flags;
 		writeMessage(_write_fd, (void *)&log_message.head1, _formats[LOG_EST0_MSG].length);
 
@@ -556,6 +673,10 @@ void Ekf2Replay::logIfUpdated()
 			log_message.body.innov.s[i + 6] = innov.vel_pos_innov_var[i];
 		}
 
+		for (unsigned i = 0; i < 3; i++) {
+			log_message.body.innov.s[i + 12] = innov.output_tracking_error[i];
+		}
+
 		writeMessage(_write_fd, (void *)&log_message.head1, _formats[LOG_EST4_MSG].length);
 
 		log_message.type = LOG_EST5_MSG;
@@ -570,6 +691,9 @@ void Ekf2Replay::logIfUpdated()
 
 		log_message.body.innov2.s[6] = innov.heading_innov;
 		log_message.body.innov2.s[7] = innov.heading_innov_var;
+		log_message.body.innov2.s[8] = innov.airspeed_innov;
+		log_message.body.innov2.s[9] = innov.airspeed_innov_var;
+
 		writeMessage(_write_fd, (void *)&log_message.head1, _formats[LOG_EST5_MSG].length);
 
 		// optical flow innovations and innovation variances
@@ -586,6 +710,16 @@ void Ekf2Replay::logIfUpdated()
 		log_message.body.innov3.s[4] = innov.hagl_innov;
 		log_message.body.innov3.s[5] = innov.hagl_innov_var;
 		writeMessage(_write_fd, (void *)&log_message.head1, _formats[LOG_EST6_MSG].length);
+
+		// Update tuning metrics
+		_numInnovSamples++;
+		_velInnovSumSq += innov.vel_pos_innov[0] * innov.vel_pos_innov[0] + innov.vel_pos_innov[1] * innov.vel_pos_innov[1];
+		_posInnovSumSq += innov.vel_pos_innov[3] * innov.vel_pos_innov[3] + innov.vel_pos_innov[4] * innov.vel_pos_innov[4];
+		_hgtInnovSumSq += innov.vel_pos_innov[5] * innov.vel_pos_innov[5];
+		_magInnovSumSq += innov.mag_innov[0] * innov.mag_innov[0] + innov.mag_innov[1] * innov.mag_innov[1] + innov.mag_innov[2]
+				  * innov.mag_innov[2];
+		_tasInnovSumSq += innov.airspeed_innov * innov.airspeed_innov;
+
 	}
 
 	// update control state
@@ -632,11 +766,52 @@ void Ekf2Replay::publishAndWaitForEstimator()
 	}
 }
 
+void Ekf2Replay::setUserParams(const char *filename)
+{
+	std::string line;
+	std::ifstream myfile(filename);
+	std::string param_name;
+	std::string value_string;
+
+	if (myfile.is_open()) {
+		while (! myfile.eof()) {
+			getline(myfile, line);
+
+			if (line.empty()) {
+				continue;
+			}
+
+			std::istringstream mystrstream(line);
+			mystrstream >> param_name;
+			mystrstream >> value_string;
+
+			double param_value_double = std::stod(value_string);
+
+			param_t handle = param_find(param_name.c_str());
+			param_type_t param_format = param_type(handle);
+
+			if (param_format == PARAM_TYPE_INT32) {
+				int32_t value = 0;
+				value = (int32_t)param_value_double;
+				param_set(handle, (const void *)&value);
+
+			} else if (param_format == PARAM_TYPE_FLOAT) {
+				float value = 0;
+				value = (float)param_value_double;
+				param_set(handle, (const void *)&value);
+			}
+		}
+
+		myfile.close();
+	}
+}
+
 void Ekf2Replay::task_main()
 {
 	// formats
 	const int _k_max_data_size = 1024;	// 16x16 bytes
 	uint8_t data[_k_max_data_size] = {};
+	const char param_file[] = "./rootfs/replay_params.txt";
 
 	// Open log file from which we read data
 	// TODO Check if file exists
@@ -661,6 +836,25 @@ void Ekf2Replay::task_main()
 	// open logfile to write
 	_write_fd = ::open(path_to_replay_log, O_WRONLY | O_CREAT, S_IRWXU);
 
+	std::ifstream tmp_file;
+	tmp_file.open(param_file);
+
+	std::string line;
+	bool set_default_params_in_file = false;
+
+	if (tmp_file.is_open() && ! tmp_file.eof()) {
+		getline(tmp_file, line);
+
+		if (line.empty()) {
+			// the parameter file is empty so write the default values to it
+			set_default_params_in_file = true;
+		}
+	}
+
+	tmp_file.close();
+
+	std::ofstream myfile(param_file, std::ios::app);
+
 	// subscribe to estimator topics
 	_att_sub = orb_subscribe(ORB_ID(vehicle_attitude));
 	_estimator_status_sub = orb_subscribe(ORB_ID(estimator_status));
@@ -673,6 +867,7 @@ void Ekf2Replay::task_main()
 	_fds[0].events = POLLIN;
 
 	bool read_first_header = false;
+	bool set_user_params = false;
 
 	PX4_INFO("Replay in progress... \n");
 	PX4_INFO("Log data will be written to %s\n", replay_file_location);
@@ -695,8 +890,9 @@ void Ekf2Replay::task_main()
 
 		read_first_header = true;
 
-		if (header[0] != HEAD_BYTE1 || header[1] != HEAD_BYTE2) {
-			PX4_WARN("bad log header\n");
+		if ((header[0] != HEAD_BYTE1 || header[1] != HEAD_BYTE2)) {
+			// we assume that the log file is finished here
+			PX4_WARN("Done!");
 			_task_should_exit = true;
 			continue;
 		}
@@ -730,6 +926,43 @@ void Ekf2Replay::task_main()
 
 			writeMessage(_write_fd, &data[0], sizeof(log_PARM_s));
 
+			// apply the parameters
+			char param_name[16];
+
+			for (unsigned i = 0; i < 16; i++) {
+				param_name[i] = data[i];
+
+				if (data[i] == '\0') {
+					break;
+				}
+			}
+
+			float param_data = 0;
+			memcpy(&param_data, &data[16], sizeof(float));
+			param_t handle = param_find(param_name);
+			param_type_t param_format = param_type(handle);
+
+			if (param_format == PARAM_TYPE_INT32) {
+				int32_t value = 0;
+				value = (int32_t)param_data;
+				param_set(handle, (const void *)&value);
+
+			} else if (param_format == PARAM_TYPE_FLOAT) {
+				param_set(handle, (const void *)&param_data);
+			}
+
+			// if the user param file was empty then we fill it with the ekf2 parameter values from
+			// the log file
+			if (set_default_params_in_file) {
+				if (strncmp(param_name, "EKF2", 4) == 0) {
+					std::ostringstream os;
+					double value = (double)param_data;
+					os << std::string(param_name) << " ";
+					os << value << "\n";
+					myfile << os.str();
+				}
+			}
+
 		} else if (header[2] == LOG_VER_MSG) {
 			// version message
 			if (::read(fd, &data[0], sizeof(log_VER_s)) != sizeof(log_VER_s)) {
@@ -752,6 +985,14 @@ void Ekf2Replay::task_main()
 			writeMessage(_write_fd, &data[0], sizeof(log_TIME_s));
 
 		} else {
+			// the first time we arrive here we should apply the parameters specified in the user file
+			// this makes sure they are applied after the parameter values of the log file
+			if (!set_user_params) {
+				myfile.close();
+				setUserParams(param_file);
+				set_user_params = true;
+			}
+
 			// data message
 			if (::read(fd, &data[0], _formats[header[2]].length - 3) != _formats[header[2]].length - 3) {
 				PX4_INFO("Done!");
@@ -787,6 +1028,16 @@ void Ekf2Replay::task_main()
 	::close(fd);
 	delete ekf2_replay::instance;
 	ekf2_replay::instance = nullptr;
+
+	// Report sensor innovation RMS values to assist with time delay tuning
+	if (_numInnovSamples > 0) {
+		PX4_INFO("GPS vel innov RMS = %6.3f", sqrt(_velInnovSumSq / _numInnovSamples));
+		PX4_INFO("GPS pos innov RMS = %6.3f", sqrt(_posInnovSumSq / _numInnovSamples));
+		PX4_INFO("Hgt innov RMS = %6.3f", sqrt(_hgtInnovSumSq / _numInnovSamples));
+		PX4_INFO("Mag innov RMS = %6.4f", sqrt(_magInnovSumSq / _numInnovSamples));
+		PX4_INFO("TAS innov RMS = %6.3f", sqrt(_tasInnovSumSq / _numInnovSamples));
+	}
+
 }
 
 void Ekf2Replay::task_main_trampoline(int argc, char *argv[])
