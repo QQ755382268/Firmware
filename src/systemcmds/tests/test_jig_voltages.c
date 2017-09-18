@@ -46,7 +46,9 @@
 #include <fcntl.h>
 #include <errno.h>
 
-#include "tests_main.h"
+//#include <nuttx/spi.h>
+
+#include "tests.h"
 
 #include <px4_adc.h>
 #include <drivers/drv_adc.h>
@@ -91,7 +93,7 @@ int test_jig_voltages(int argc, char *argv[])
 	int ret = OK;
 
 	if (fd < 0) {
-		PX4_ERR("can't open ADC device");
+		warnx("can't open ADC device");
 		return 1;
 	}
 
@@ -102,7 +104,7 @@ int test_jig_voltages(int argc, char *argv[])
 
 	if (count < 0) {
 		close(fd);
-		PX4_ERR("can't read from ADC driver. Forgot 'adc start' command?");
+		warnx("can't read from ADC driver. Forgot 'adc start' command?");
 		return 1;
 	}
 
@@ -114,7 +116,7 @@ int test_jig_voltages(int argc, char *argv[])
 
 	printf("\n");
 
-	PX4_INFO("\t ADC operational.\n");
+	warnx("\t ADC operational.\n");
 
 	/* Expected values */
 	int16_t expected_min[] = {2800, 2800, 1800,  800};
@@ -123,7 +125,7 @@ int test_jig_voltages(int argc, char *argv[])
 
 	if (channels < 4) {
 		close(fd);
-		PX4_ERR("not all four test channels available, aborting.");
+		warnx("not all four test channels available, aborting.");
 		return 1;
 
 	} else {
@@ -139,23 +141,23 @@ int test_jig_voltages(int argc, char *argv[])
 		ret += (expected_min[2] > data[2].am_data || expected_max[2] < data[2].am_data) ? 1 : 0;
 		ret += (expected_min[3] > data[3].am_data || expected_max[3] < data[3].am_data) ? 1 : 0;
 
-		PX4_INFO("Sample:");
-		PX4_INFO("channel: %d value: %d (allowed min: %d, allowed max: %d), result: %s",
-			 data[0].am_channel, (int)(data[0].am_data), expected_min[0], expected_max[0], check_res[0]);
-		PX4_INFO("channel: %d value: %d (allowed min: %d, allowed max: %d), result: %s",
-			 data[1].am_channel, (int)(data[1].am_data), expected_min[1], expected_max[1], check_res[1]);
-		PX4_INFO("channel: %d value: %d (allowed min: %d, allowed max: %d), result: %s",
-			 data[2].am_channel, (int)(data[2].am_data), expected_min[2], expected_max[2], check_res[2]);
-		PX4_INFO("channel: %d value: %d (allowed min: %d, allowed max: %d), result: %s",
-			 data[3].am_channel, (int)(data[3].am_data), expected_min[3], expected_max[3], check_res[3]);
+		message("Sample:");
+		message("channel: %d value: %d (allowed min: %d, allowed max: %d), result: %s\n",
+			data[0].am_channel, (int)(data[0].am_data), expected_min[0], expected_max[0], check_res[0]);
+		message("channel: %d value: %d (allowed min: %d, allowed max: %d), result: %s\n",
+			data[1].am_channel, (int)(data[1].am_data), expected_min[1], expected_max[1], check_res[1]);
+		message("channel: %d value: %d (allowed min: %d, allowed max: %d), result: %s\n",
+			data[2].am_channel, (int)(data[2].am_data), expected_min[2], expected_max[2], check_res[2]);
+		message("channel: %d value: %d (allowed min: %d, allowed max: %d), result: %s\n",
+			data[3].am_channel, (int)(data[3].am_data), expected_min[3], expected_max[3], check_res[3]);
 
 		if (ret != OK) {
-			PX4_ERR("\t JIG voltages test FAILED. Some channels where out of allowed range. Check supply voltages.");
+			printf("\t JIG voltages test FAILED. Some channels where out of allowed range. Check supply voltages.\n");
 			goto errout_with_dev;
 		}
 	}
 
-	PX4_INFO("JIG voltages test successful.");
+	printf("\t JIG voltages test successful.\n");
 
 errout_with_dev:
 

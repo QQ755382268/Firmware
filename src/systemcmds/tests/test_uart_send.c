@@ -49,7 +49,7 @@
 
 #include <arch/board/board.h>
 
-#include "tests_main.h"
+#include "tests.h"
 
 #include <math.h>
 #include <float.h>

@@ -52,10 +52,8 @@ static const unsigned orb_maxpath = 64;
 const int ERROR = -1;
 
 enum Flavor {
-	PUBSUB = 0,
-	PARAM,
-
-	Flavor_count
+	PUBSUB,
+	PARAM
 };
 
 struct orb_advertdata {

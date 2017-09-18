@@ -69,13 +69,13 @@
 
 #define ADDR_WHO_AM_I			0x0F
 
-#define ACCELSIM_ACCEL_DEFAULT_RATE			250
+#define ACCELSIM_ACCEL_DEFAULT_RATE			800
 #define ACCELSIM_ACCEL_DEFAULT_DRIVER_FILTER_FREQ	30
 #define ACCELSIM_ONE_G					9.80665f
 
 #define DIR_READ				(1<<7)
 #define DIR_WRITE				(0<<7)
-#define ACC_READ 				(1<<5)
+#define ACC_READ 				(0<<6)
 #define MAG_READ 				(1<<6)
 
 extern "C" { __EXPORT int accelsim_main(int argc, char *argv[]); }
@@ -802,21 +802,9 @@ ACCELSIM::stop()
 void
 ACCELSIM::_measure()
 {
-#if 0
-	static int x = 0;
-
-	// Verify the samples are being taken at the expected rate
-	if (x == 99) {
-		x = 0;
-		PX4_INFO("ACCELSIM::measure %" PRIu64, hrt_absolute_time());
-
-	} else {
-		x++;
-	}
-
-#endif
-
+	//PX4_INFO("ACCELSIM::_measure");
 	/* status register and data as read back from the device */
+
 #pragma pack(push, 1)
 	struct {
 		uint8_t		cmd;

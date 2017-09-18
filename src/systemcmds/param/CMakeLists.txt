@@ -33,11 +33,12 @@
 px4_add_module(
 	MODULE systemcmds__param
 	MAIN param
-	STACK_MAIN 2500
+	STACK 2500
 	COMPILE_FLAGS
+		-Os
 	SRCS
 		param.c
 	DEPENDS
 		platforms__common
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :
+# vim: set noet ft=cmake fenc=utf-8 ff=unix : 

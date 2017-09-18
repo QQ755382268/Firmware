@@ -35,10 +35,11 @@ include_directories("../../uORB")
 px4_add_module(
 	MODULE modules__muorb__adsp
 	COMPILE_FLAGS
+		-Os
 	SRCS
 		px4muorb.cpp
 		uORBFastRpcChannel.cpp
 	DEPENDS
 		platforms__common
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :
+# vim: set noet ft=cmake fenc=utf-8 ff=unix : 

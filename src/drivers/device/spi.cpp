@@ -95,7 +95,7 @@ SPI::init()
 
 	/* attach to the spi bus */
 	if (_dev == nullptr) {
-		_dev = px4_spibus_initialize(_bus);
+		_dev = up_spiinitialize(_bus);
 	}
 
 	if (_dev == nullptr) {
@@ -152,9 +152,9 @@ SPI::transfer(uint8_t *send, uint8_t *recv, unsigned len)
 	switch (mode) {
 	default:
 	case LOCK_PREEMPTION: {
-			irqstate_t state = px4_enter_critical_section();
+			irqstate_t state = irqsave();
 			result = _transfer(send, recv, len);
-			px4_leave_critical_section(state);
+			irqrestore(state);
 		}
 		break;
 

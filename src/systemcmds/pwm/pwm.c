@@ -75,7 +75,7 @@ usage(const char *reason)
 
 	errx(1,
 	     "usage:\n"
-	     "pwm arm|disarm|rate|failsafe|disarmed|min|max|test|steps|info  ...\n"
+	     "pwm arm|disarm|rate|failsafe|disarmed|min|max|test|info  ...\n"
 	     "\n"
 	     "arm\t\t\t\tArm output\n"
 	     "disarm\t\t\t\tDisarm output\n"
@@ -100,9 +100,6 @@ usage(const char *reason)
 	     "\t[-m <channel mask> ]\t(e.g. 0xF)\n"
 	     "\t[-a]\t\t\tConfigure all outputs\n"
 	     "\t-p <pwm value>\t\tPWM value\n"
-	     "\n"
-	     "steps ...\t\t\tRun 5 steps\n"
-	     "\t[-c <channels>]\t\t(e.g. 1234)\n"
 	     "\n"
 	     "info\t\t\t\tPrint information\n"
 	     "\n"
@@ -353,11 +350,11 @@ pwm_main(int argc, char *argv[])
 	} else if (!strcmp(argv[1], "min")) {
 
 		if (set_mask == 0) {
-			usage("min: no channels set");
+			usage("no channels set");
 		}
 
 		if (pwm_value == 0) {
-			usage("min: no PWM value provided");
+			usage("no PWM value provided");
 		}
 
 		struct pwm_output_values pwm_values;
@@ -384,7 +381,7 @@ pwm_main(int argc, char *argv[])
 		}
 
 		if (pwm_values.channel_count == 0) {
-			usage("min: no channels provided");
+			usage("no PWM values added");
 
 		} else {
 
@@ -431,7 +428,7 @@ pwm_main(int argc, char *argv[])
 		}
 
 		if (pwm_values.channel_count == 0) {
-			usage("max: no PWM channels");
+			usage("no PWM values added");
 
 		} else {
 
@@ -478,7 +475,7 @@ pwm_main(int argc, char *argv[])
 		}
 
 		if (pwm_values.channel_count == 0) {
-			usage("disarmed: no PWM channels");
+			usage("no PWM values added");
 
 		} else {
 
@@ -498,7 +495,7 @@ pwm_main(int argc, char *argv[])
 		}
 
 		if (pwm_value == 0) {
-			usage("failsafe: no PWM provided");
+			usage("no PWM provided");
 		}
 
 		struct pwm_output_values pwm_values;
@@ -525,7 +522,7 @@ pwm_main(int argc, char *argv[])
 		}
 
 		if (pwm_values.channel_count == 0) {
-			usage("failsafe: no PWM channels");
+			usage("no PWM values added");
 
 		} else {
 
@@ -666,7 +663,7 @@ pwm_main(int argc, char *argv[])
 
 						} else if (phase == 1) {
 							/* ramp - depending how steep it is this ramp will look instantaneous on the output */
-							val = idle + (full - idle) * ((float)phase_counter / phase_maxcount);
+							val = idle + (full - idle) * (phase_maxcount / (float)phase_counter);
 
 						} else {
 							val = off;

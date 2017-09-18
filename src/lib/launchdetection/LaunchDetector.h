@@ -55,10 +55,7 @@ class __EXPORT LaunchDetector : public control::SuperBlock
 {
 public:
 	LaunchDetector();
-	LaunchDetector(const LaunchDetector &) = delete;
-	LaunchDetector operator=(const LaunchDetector &) = delete;
-	virtual ~LaunchDetector();
-
+	~LaunchDetector();
 	void reset();
 
 	void update(float accel_x);
@@ -82,6 +79,7 @@ private:
 	LaunchMethod *launchMethods[1];
 	control::BlockParamInt launchdetection_on;
 	control::BlockParamFloat throttlePreTakeoff;
+
 
 };
 

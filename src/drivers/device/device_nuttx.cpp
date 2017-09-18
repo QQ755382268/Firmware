@@ -91,7 +91,8 @@ Device::Device(const char *name,
 	_name(name),
 	_debug_enabled(false),
 	// private
-	_irq(irq)
+	_irq(irq),
+	_irq_attached(false)
 {
 	sem_init(&_lock, 0, 1);
 
@@ -108,7 +109,7 @@ Device::~Device()
 {
 	sem_destroy(&_lock);
 
-	if (_irq) {
+	if (_irq_attached) {
 		unregister_interrupt(_irq);
 	}
 }
@@ -127,17 +128,20 @@ Device::init()
 		ret = register_interrupt(_irq, this);
 
 		if (ret != OK) {
-			_irq = 0;
+			goto out;
 		}
+
+		_irq_attached = true;
 	}
 
+out:
 	return ret;
 }
 
 void
 Device::interrupt_enable()
 {
-	if (_irq) {
+	if (_irq_attached) {
 		up_enable_irq(_irq);
 	}
 }
@@ -145,7 +149,7 @@ Device::interrupt_enable()
 void
 Device::interrupt_disable()
 {
-	if (_irq) {
+	if (_irq_attached) {
 		up_disable_irq(_irq);
 	}
 }

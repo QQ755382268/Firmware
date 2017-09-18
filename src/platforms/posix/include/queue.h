@@ -42,12 +42,6 @@
 
 #include <sys/types.h>
 
-#ifdef __cplusplus
-#include <cstddef>	// NULL
-#else
-#include <stddef.h>	// NULL
-#endif
-
 /************************************************************************
  * Pre-processor Definitions
  ************************************************************************/
@@ -67,6 +61,9 @@
 
 // Required for Linux
 #define FAR
+#ifndef NULL
+#define NULL (void *)0
+#endif
 
 /************************************************************************
  * Global Type Declarations

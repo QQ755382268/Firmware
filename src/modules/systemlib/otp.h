@@ -43,6 +43,8 @@
 #ifndef OTP_H_
 #define OTP_H_
 
+__BEGIN_DECLS
+
 #define ADDR_OTP_START			0x1FFF7800
 #define ADDR_OTP_LOCK_START		0x1FFF7A00
 
@@ -128,7 +130,6 @@ union udid {
 };
 #pragma pack(pop)
 
-__BEGIN_DECLS
 
 /**
  *   s

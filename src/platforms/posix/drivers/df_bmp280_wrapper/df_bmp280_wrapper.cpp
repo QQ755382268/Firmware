@@ -115,6 +115,16 @@ DfBmp280Wrapper::~DfBmp280Wrapper()
 
 int DfBmp280Wrapper::start()
 {
+	// TODO: don't publish garbage here
+	baro_report baro_report = {};
+	_baro_topic = orb_advertise_multi(ORB_ID(sensor_baro), &baro_report,
+					  &_baro_orb_class_instance, ORB_PRIO_DEFAULT);
+
+	if (_baro_topic == nullptr) {
+		PX4_ERR("sensor_baro advert fail");
+		return -1;
+	}
+
 	/* Init device and start sensor. */
 	int ret = init();
 
@@ -151,7 +161,7 @@ int DfBmp280Wrapper::_publish(struct baro_sensor_data &data)
 	perf_begin(_baro_sample_perf);
 
 	baro_report baro_report = {};
-	baro_report.timestamp = hrt_absolute_time();
+	baro_report.timestamp = data.last_read_time_usec;
 
 	baro_report.pressure = data.pressure_pa;
 	baro_report.temperature = data.temperature_c;
@@ -159,7 +169,7 @@ int DfBmp280Wrapper::_publish(struct baro_sensor_data &data)
 	// TODO: verify this, it's just copied from the MS5611 driver.
 
 	// Constant for now
-	const double MSL_PRESSURE_KPA = 101325.0 / 1000.0;
+	const float MSL_PRESSURE = 101325.0f;
 
 	/* tropospheric properties (0-11km) for standard atmosphere */
 	const double T1 = 15.0 + 273.15;	/* temperature at base height in Kelvin */
@@ -168,10 +178,10 @@ int DfBmp280Wrapper::_publish(struct baro_sensor_data &data)
 	const double R  = 287.05;	/* ideal gas constant in J/kg/K */
 
 	/* current pressure at MSL in kPa */
-	double p1 = MSL_PRESSURE_KPA;
+	double p1 = MSL_PRESSURE / 1000.0;
 
 	/* measured pressure in kPa */
-	double p = static_cast<double>(data.pressure_pa) / 1000.0;
+	double p = data.pressure_pa / 1000.0;
 
 	/*
 	 * Solve:
@@ -187,11 +197,7 @@ int DfBmp280Wrapper::_publish(struct baro_sensor_data &data)
 	// TODO: when is this ever blocked?
 	if (!(m_pub_blocked)) {
 
-		if (_baro_topic == nullptr) {
-			_baro_topic = orb_advertise_multi(ORB_ID(sensor_baro), &baro_report,
-							  &_baro_orb_class_instance, ORB_PRIO_DEFAULT);
-
-		} else {
+		if (_baro_topic != nullptr) {
 			orb_publish(ORB_ID(sensor_baro), _baro_topic, &baro_report);
 		}
 	}

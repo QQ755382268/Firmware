@@ -44,9 +44,12 @@
 #include <systemlib/param/param.h>
 
 /**
- * Test mode (Identify) of MKBLCTRL Driver
+ * Enables testmode (Identify) of MKBLCTRL Driver
  *
- * @boolean
+ * @value 0 Disabled
+ * @value 1 Enabled
+ * @min 0
+ * @max 1
  * @group MKBLCTRL Testmode
  */
 PARAM_DEFINE_INT32(MKBLCTRL_TEST, 0);

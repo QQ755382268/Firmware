@@ -59,7 +59,7 @@
 extern "C" __EXPORT int mixer_main(int argc, char *argv[]);
 
 static void	usage(const char *reason);
-static int	load(const char *devname, const char *fname, bool append);
+static int	load(const char *devname, const char *fname);
 
 int
 mixer_main(int argc, char *argv[])
@@ -75,23 +75,10 @@ mixer_main(int argc, char *argv[])
 			return 1;
 		}
 
-		int ret = load(argv[2], argv[3], false);
+		int ret = load(argv[2], argv[3]);
 
 		if (ret != 0) {
-			PX4_ERR("failed to load mixer");
-			return 1;
-		}
-
-	} else if (!strcmp(argv[1], "append")) {
-		if (argc < 4) {
-			usage("missing device or filename");
-			return 1;
-		}
-
-		int ret = load(argv[2], argv[3], true);
-
-		if (ret != 0) {
-			PX4_ERR("failed to append mixer");
+			warnx("failed to load mixer");
 			return 1;
 		}
 
@@ -115,7 +102,7 @@ usage(const char *reason)
 }
 
 static int
-load(const char *devname, const char *fname, bool append)
+load(const char *devname, const char *fname)
 {
 	// sleep a while to ensure device has been set up
 	usleep(20000);
@@ -124,22 +111,20 @@ load(const char *devname, const char *fname, bool append)
 
 	/* open the device */
 	if ((dev = px4_open(devname, 0)) < 0) {
-		PX4_ERR("can't open %s\n", devname);
+		warnx("can't open %s\n", devname);
 		return 1;
 	}
 
-	/* reset mixers on the device, but not if appending */
-	if (!append) {
-		if (px4_ioctl(dev, MIXERIOCRESET, 0)) {
-			PX4_ERR("can't reset mixers on %s", devname);
-			return 1;
-		}
+	/* reset mixers on the device */
+	if (px4_ioctl(dev, MIXERIOCRESET, 0)) {
+		warnx("can't reset mixers on %s", devname);
+		return 1;
 	}
 
 	char buf[2048];
 
 	if (load_mixer_file(fname, &buf[0], sizeof(buf)) < 0) {
-		PX4_ERR("can't load mixer file: %s", fname);
+		warnx("can't load mixer: %s", fname);
 		return 1;
 	}
 
@@ -147,7 +132,7 @@ load(const char *devname, const char *fname, bool append)
 	int ret = px4_ioctl(dev, MIXERIOCLOADBUF, (unsigned long)buf);
 
 	if (ret < 0) {
-		PX4_ERR("failed to load mixers from %s", fname);
+		warnx("error loading mixers from %s", fname);
 		return 1;
 	}
 

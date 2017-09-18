@@ -35,10 +35,9 @@
 /**
  * @file snapdragon_rc_pwm.cpp
  * @author Roman Bapst <roman@px4.io>
- * @author Julian Oes <julian@oes.ch>
  *
- * This driver sends RC commands to the Snapdragon via UART. On the same UART
- * it receives pwm motor commands from the Snapdragon.
+ * This driver sends rc commands to the Snapdragon via UART. On the same UART it receives pwm
+ * motor commands from the Snapdragon.
  */
 
 
@@ -52,7 +51,7 @@
 #include <termios.h>
 #include <uORB/topics/input_rc.h>
 #include <uORB/topics/actuator_controls.h>
-
+#include <uORB/topics/actuator_controls_0.h>
 #include <v1.0/mavlink_types.h>
 #include <v1.0/common/mavlink.h>
 
@@ -68,15 +67,14 @@ namespace snapdragon_rc_pwm
 static const uint8_t mavlink_message_lengths[256] = MAVLINK_MESSAGE_LENGTHS;
 static const uint8_t mavlink_message_crcs[256] = MAVLINK_MESSAGE_CRCS;
 
-volatile bool _task_should_exit = false; // flag indicating if snapdragon_rc_pwm task should exit
+volatile bool _task_should_exit = false; // flag indicating if uart_esc task should exit
 static char _device[MAX_LEN_DEV_PATH];
-static bool _is_running = false;         // flag indicating if snapdragon_rc_pwm app is running
+static bool _is_running = false;         // flag indicating if uart_esc app is running
 static px4_task_t _task_handle = -1;     // handle to the task main thread
 static int _uart_fd = -1;
 int _pwm_fd = -1;
 static bool _flow_control_enabled = false;
 int _rc_sub = -1;
-int32_t _pwm_disarmed;
 
 hrt_abstime _last_actuator_controls_received = 0;
 
@@ -87,7 +85,7 @@ void usage();
 
 void start();
 
-/** snapdragon_rc_pwm stop */
+/** uart_esc stop */
 void stop();
 
 int initialise_uart();
@@ -105,7 +103,7 @@ void set_pwm_output(mavlink_actuator_control_target_t *actuator_controls);
 /** task main trampoline function */
 void task_main_trampoline(int argc, char *argv[]);
 
-/** snapdragon_rc_pwm thread primary entry point */
+/** uart_esc thread primary entry point */
 void task_main(int argc, char *argv[]);
 
 void task_main(int argc, char *argv[])
@@ -130,9 +128,7 @@ void task_main(int argc, char *argv[])
 	fds[0].fd = _uart_fd;
 	fds[0].events = POLLIN;
 
-	param_get(param_find("PWM_DISARMED"), &_pwm_disarmed);
-
-	while (!_task_should_exit) {
+	while (true) {
 
 		// wait for up to 100ms for data
 		int pret = px4_poll(&fds[0], (sizeof(fds) / sizeof(fds[0])), 100);
@@ -156,7 +152,7 @@ void task_main(int argc, char *argv[])
 				mavlink_message_t msg;
 
 				for (int i = 0; i < len; ++i) {
-					if (mavlink_parse_char(MAVLINK_COMM_0, serial_buf[i], &msg, &serial_status)) {
+					if (mavlink_parse_char(MAVLINK_COMM_1, serial_buf[i], &msg, &serial_status)) {
 						// have a message, handle it
 						handle_message(&msg);
 					}
@@ -208,9 +204,9 @@ void handle_message(mavlink_message_t *msg)
 void set_pwm_output(mavlink_actuator_control_target_t *actuator_controls)
 {
 	if (actuator_controls == nullptr) {
-		// Without valid argument, set all channels to PWM_DISARMED
+		// Without valid argument, set all channels to 0
 		for (unsigned i = 0; i < PWM_OUTPUT_MAX_CHANNELS; i++) {
-			int ret = ::ioctl(_pwm_fd, PWM_SERVO_SET(i), _pwm_disarmed);
+			int ret = ::ioctl(_pwm_fd, PWM_SERVO_SET(i), 0);
 
 			if (ret != OK) {
 				PX4_ERR("PWM_SERVO_SET(%d)", i);
@@ -234,7 +230,7 @@ void set_pwm_output(mavlink_actuator_control_target_t *actuator_controls)
 void send_rc_mavlink()
 {
 	mavlink_rc_channels_t rc_message;
-	rc_message.time_boot_ms = _rc.timestamp / 1000;
+	rc_message.time_boot_ms = _rc.timestamp_publication / 1000;
 	rc_message.chancount = _rc.channel_count;
 	rc_message.chan1_raw = (_rc.channel_count > 0) ? _rc.values[0] : UINT16_MAX;
 	rc_message.chan2_raw = (_rc.channel_count > 1) ? _rc.values[1] : UINT16_MAX;
@@ -367,7 +363,7 @@ int deinitialize_uart()
 	return close(_uart_fd);
 }
 
-// snapdragon_rc_pwm main entrance
+// uart_esc main entrance
 void task_main_trampoline(int argc, char *argv[])
 {
 	task_main(argc, argv);
@@ -396,8 +392,6 @@ void start()
 void stop()
 {
 	// TODO - set thread exit signal to terminate the task main thread
-
-	_task_should_exit = true;
 
 	_is_running = false;
 	_task_handle = -1;
@@ -434,25 +428,23 @@ int snapdragon_rc_pwm_main(int argc, char *argv[])
 		}
 	}
 
+	// Check on required arguments
+	if (device == NULL || strlen(device) == 0) {
+		snapdragon_rc_pwm::usage();
+		return 1;
+	}
+
+	memset(snapdragon_rc_pwm::_device, 0, MAX_LEN_DEV_PATH);
+	strncpy(snapdragon_rc_pwm::_device, device, strlen(device));
+
 	const char *verb = argv[myoptind];
 
 	/*
 	 * Start/load the driver.
 	 */
 	if (!strcmp(verb, "start")) {
-
-		// Check on required arguments
-		if (device == NULL || strlen(device) == 0) {
-			snapdragon_rc_pwm::usage();
-			return 1;
-		}
-
-		memset(snapdragon_rc_pwm::_device, 0, MAX_LEN_DEV_PATH);
-		strncpy(snapdragon_rc_pwm::_device, device, strlen(device));
-
-
 		if (snapdragon_rc_pwm::_is_running) {
-			PX4_WARN("snapdragon_rc_pwm already running");
+			PX4_WARN("uart_esc already running");
 			return 1;
 		}
 
@@ -460,7 +452,7 @@ int snapdragon_rc_pwm_main(int argc, char *argv[])
 	}
 
 	else if (!strcmp(verb, "stop")) {
-		if (!snapdragon_rc_pwm::_is_running) {
+		if (snapdragon_rc_pwm::_is_running) {
 			PX4_WARN("snapdragon_rc_pwm is not running");
 			return 1;
 		}

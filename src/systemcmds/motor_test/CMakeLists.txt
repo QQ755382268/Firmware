@@ -33,11 +33,12 @@
 px4_add_module(
 	MODULE systemcmds__motor_test
 	MAIN motor_test
-	STACK_MAIN 4096
+	STACK 4096
 	COMPILE_FLAGS
+		-Os
 	SRCS
 		motor_test.c
 	DEPENDS
 		platforms__common
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :
+# vim: set noet ft=cmake fenc=utf-8 ff=unix : 

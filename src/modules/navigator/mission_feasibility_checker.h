@@ -44,7 +44,7 @@
 
 #include <unistd.h>
 #include <uORB/topics/mission.h>
-#include <uORB/topics/fw_pos_ctrl_status.h>
+#include <uORB/topics/navigation_capabilities.h>
 #include <dataman/dataman.h>
 #include "geofence.h"
 
@@ -54,15 +54,15 @@ class MissionFeasibilityChecker
 private:
 	orb_advert_t		*_mavlink_log_pub;
 
-	int _fw_pos_ctrl_status_sub;
-	struct fw_pos_ctrl_status_s _fw_pos_ctrl_status;
+	int _capabilities_sub;
+	struct navigation_capabilities_s _nav_caps;
 
 	bool _initDone;
 	bool _dist_1wp_ok;
 	void init();
 
 	/* Checks for all airframes */
-	bool checkGeofence(dm_item_t dm_current, size_t nMissionItems, Geofence &geofence, float home_alt);
+	bool checkGeofence(dm_item_t dm_current, size_t nMissionItems, Geofence &geofence);
 	bool checkHomePositionAltitude(dm_item_t dm_current, size_t nMissionItems, float home_alt, bool home_valid, bool &warning_issued, bool throw_error = false);
 	bool checkMissionItemValidity(dm_item_t dm_current, size_t nMissionItems, bool condition_landed);
 	bool check_dist_1wp(dm_item_t dm_current, size_t nMissionItems, double curr_lat, double curr_lon, float dist_first_wp, bool &warning_issued);
@@ -78,10 +78,6 @@ private:
 public:
 
 	MissionFeasibilityChecker();
-
-	MissionFeasibilityChecker(const MissionFeasibilityChecker &) = delete;
-	MissionFeasibilityChecker &operator=(const MissionFeasibilityChecker &) = delete;
-
 	~MissionFeasibilityChecker() {}
 
 	/*

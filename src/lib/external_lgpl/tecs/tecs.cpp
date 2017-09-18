@@ -40,7 +40,7 @@ void TECS::update_state(float baro_altitude, float airspeed, const math::Matrix<
 
 	// Calculate time in seconds since last update
 	uint64_t now = ecl_absolute_time();
-	float DT = max((now - _update_50hz_last_usec), UINT64_C(0)) * 1.0e-6f;
+	float DT = max((now - _update_50hz_last_usec), 0ULL) * 1.0e-6f;
 
 	// printf("dt: %10.6f baro alt: %6.2f eas: %6.2f R(0,0): %6.2f, R(1,1): %6.2f\naccel body: %6.2f %6.2f %6.2f\naccel earth: %6.2f %6.2f %6.2f\n",
 	// 	DT, baro_altitude, airspeed, rotMat(0, 0), rotMat(1, 1), accel_body(0), accel_body(1), accel_body(2),
@@ -122,7 +122,7 @@ void TECS::_update_speed(float airspeed_demand, float indicated_airspeed,
 {
 	// Calculate time in seconds since last update
 	uint64_t now = ecl_absolute_time();
-	float DT = max((now - _update_speed_last_usec), UINT64_C(0)) * 1.0e-6f;
+	float DT = max((now - _update_speed_last_usec), 0ULL) * 1.0e-6f;
 
 	// Convert equivalent airspeeds to true airspeeds
 
@@ -165,7 +165,6 @@ void TECS::_update_speed(float airspeed_demand, float indicated_airspeed,
 	_integ4_state = _integ4_state + integ4_input * DT;
 	float integ5_input = _integ4_state + _vel_dot + aspdErr * _spdCompFiltOmega * 1.4142f;
 	_integ5_state = _integ5_state + integ5_input * DT;
-
 	// limit the airspeed to a minimum of 3 m/s
 	_integ5_state = max(_integ5_state, 3.0f);
 	_update_speed_last_usec = now;
@@ -447,36 +446,35 @@ void TECS::_update_pitch(void)
 	_SEB_error = SEB_dem - (_SPE_est * SPE_weighting - _SKE_est * SKE_weighting);
 	_SEBdot_error = SEBdot_dem - (_SPEdot * SPE_weighting - _SKEdot * SKE_weighting);
 
-	// Calculate factor relating an error in specific energy to a desired delta pitch angle
-	float gainInv = _integ5_state * _timeConst * CONSTANTS_ONE_G;
-
 	// Calculate integrator state, constraining input if pitch limits are exceeded
 	float integ7_input = _SEB_error * _integGain;
 
-	// constrain the integrator input to prevent it changing in the direction that increases pitch demand saturation
-	// if the pitch demand is saturated, then decay the integrator at the control loop time constant
 	if (_pitch_dem_unc > _PITCHmaxf) {
-		integ7_input = min(integ7_input, min((_PITCHmaxf - _pitch_dem_unc) * gainInv / _timeConst, 0.0f));
+		integ7_input = min(integ7_input, _PITCHmaxf - _pitch_dem_unc);
 
 	} else if (_pitch_dem_unc < _PITCHminf) {
-		integ7_input = max(integ7_input, max((_PITCHminf - _pitch_dem_unc) * gainInv / _timeConst, 0.0f));
+		integ7_input = max(integ7_input, _PITCHminf - _pitch_dem_unc);
 	}
 
-	// pitch loop integration
 	_integ7_state = _integ7_state + integ7_input * _DT;
 
-	// Specific Energy Balance correction excluding integrator contribution
-	float SEB_correction = _SEB_error + _SEBdot_error * _ptchDamp + SEBdot_dem * _timeConst;
-
+	// Apply max and min values for integrator state that will allow for no more than
+	// 5deg of saturation. This allows for some pitch variation due to gusts before the
+	// integrator is clipped. Otherwise the effectiveness of the integrator will be reduced in turbulence
 	// During climbout/takeoff, bias the demanded pitch angle so that zero speed error produces a pitch angle
 	// demand equal to the minimum value (which is )set by the mission plan during this mode). Otherwise the
 	// integrator has to catch up before the nose can be raised to reduce speed during climbout.
-	if (_climbOutDem) {
-		SEB_correction += _PITCHminf * gainInv;
+	float gainInv = (_integ5_state * _timeConst * CONSTANTS_ONE_G);
+	float temp = _SEB_error + _SEBdot_error * _ptchDamp + SEBdot_dem * _timeConst;
+	if (_climbOutDem)
+	{
+		temp += _PITCHminf * gainInv;
 	}
+	_integ7_state = constrain(_integ7_state, (gainInv * (_PITCHminf - 0.0783f)) - temp, (gainInv * (_PITCHmaxf + 0.0783f)) - temp);
+
 
 	// Calculate pitch demand from specific energy balance signals
-	_pitch_dem_unc = (SEB_correction + _integ7_state) / gainInv;
+	_pitch_dem_unc = (temp + _integ7_state) / gainInv;
 
 	// Constrain pitch demand
 	_pitch_dem = constrain(_pitch_dem_unc, _PITCHminf, _PITCHmaxf);
@@ -495,7 +493,7 @@ void TECS::_update_pitch(void)
 	_last_pitch_dem = _pitch_dem;
 }
 
-void TECS::_initialise_states(float pitch, float throttle_cruise, float baro_altitude, float ptchMinCO_rad, float EAS2TAS)
+void TECS::_initialise_states(float pitch, float throttle_cruise, float baro_altitude, float ptchMinCO_rad)
 {
 	// Initialise states and variables if DT > 1 second or in climbout
 	if (_update_pitch_throttle_last_usec == 0 || _DT > DT_MAX || !_in_air || !_states_initalized) {
@@ -503,22 +501,18 @@ void TECS::_initialise_states(float pitch, float throttle_cruise, float baro_alt
 		_integ2_state = 0.0f;
 		_integ3_state = baro_altitude;
 		_integ4_state = 0.0f;
-		_integ5_state = _EAS * EAS2TAS;
+		_integ5_state = _EAS;
 		_integ6_state = 0.0f;
 		_integ7_state = 0.0f;
-
 		_last_throttle_dem = throttle_cruise;
-		_last_pitch_dem = constrain(pitch, _PITCHminf, _PITCHmaxf);
-		_pitch_dem_unc = _last_pitch_dem;
-
+		_last_pitch_dem = pitch;
 		_hgt_dem_adj_last = baro_altitude;
 		_hgt_dem_adj = _hgt_dem_adj_last;
 		_hgt_dem_prev = _hgt_dem_adj_last;
 		_hgt_dem_in_old = _hgt_dem_adj_last;
-
-		_TAS_dem_last = _EAS * EAS2TAS;
-		_TAS_dem_adj = _TAS_dem_last;
-
+		_TAS_dem_last = _TAS_dem;
+		_TAS_dem_adj = _TAS_dem;
+		_pitch_dem_unc = pitch;
 		_underspeed = false;
 		_badDescent = false;
 
@@ -529,14 +523,11 @@ void TECS::_initialise_states(float pitch, float throttle_cruise, float baro_alt
 	} else if (_climbOutDem) {
 		_PITCHminf          = ptchMinCO_rad;
 		_THRminf            = _THRmaxf - 0.01f;
-
 		_hgt_dem_adj_last  = baro_altitude;
 		_hgt_dem_adj       = _hgt_dem_adj_last;
 		_hgt_dem_prev      = _hgt_dem_adj_last;
-
-		_TAS_dem_last      = _EAS * EAS2TAS;
-		_TAS_dem_adj       = _EAS * EAS2TAS;
-
+		_TAS_dem_last      = _TAS_dem;
+		_TAS_dem_adj       = _TAS_dem;
 		_underspeed        = false;
 		_badDescent 	   = false;
 	}
@@ -552,14 +543,14 @@ void TECS::_update_STE_rate_lim(void)
 	_STEdot_min = - _minSinkRate * CONSTANTS_ONE_G;
 }
 
-void TECS::update_pitch_throttle(const math::Matrix<3,3> &rotMat, float pitch, float baro_altitude, float hgt_dem,
-				float EAS_dem, float indicated_airspeed, float EAS2TAS, bool climbOutDem, float ptchMinCO,
-				float throttle_min, float throttle_max, float throttle_cruise, float pitch_limit_min, float pitch_limit_max)
+void TECS::update_pitch_throttle(const math::Matrix<3,3> &rotMat, float pitch, float baro_altitude, float hgt_dem, float EAS_dem, float indicated_airspeed, float EAS2TAS, bool climbOutDem, float ptchMinCO,
+				 float throttle_min, float throttle_max, float throttle_cruise,
+				 float pitch_limit_min, float pitch_limit_max)
 {
 
 	// Calculate time in seconds since last update
 	uint64_t now = ecl_absolute_time();
-	_DT = max((now - _update_pitch_throttle_last_usec), UINT64_C(0)) * 1.0e-6f;
+	_DT = max((now - _update_pitch_throttle_last_usec), 0ULL) * 1.0e-6f;
 
 	// printf("tecs in: dt:%10.6f pitch: %6.2f baro_alt: %6.2f alt sp: %6.2f\neas sp: %6.2f eas: %6.2f, eas2tas: %6.2f\n %s pitch min C0: %6.2f thr min: %6.2f, thr max: %6.2f thr cruis: %6.2f pt min: %6.2f, pt max: %6.2f\n",
 	// 	_DT, pitch, baro_altitude, hgt_dem, EAS_dem, indicated_airspeed, EAS2TAS, (climbOutDem) ? "climb" : "level", ptchMinCO, throttle_min, throttle_max, throttle_cruise, pitch_limit_min, pitch_limit_max);
@@ -572,7 +563,7 @@ void TECS::update_pitch_throttle(const math::Matrix<3,3> &rotMat, float pitch, f
 	_climbOutDem = climbOutDem;
 
 	// initialise selected states and variables if DT > 1 second or in climbout
-	_initialise_states(pitch, throttle_cruise, baro_altitude, ptchMinCO, EAS2TAS);
+	_initialise_states(pitch, throttle_cruise, baro_altitude, ptchMinCO);
 
 	if (!_in_air) {
 		return;
@@ -584,14 +575,14 @@ void TECS::update_pitch_throttle(const math::Matrix<3,3> &rotMat, float pitch, f
 	// Calculate Specific Total Energy Rate Limits
 	_update_STE_rate_lim();
 
-	// Detect underspeed condition
-	_detect_underspeed();
-
 	// Calculate the speed demand
 	_update_speed_demand();
 
 	// Calculate the height demand
 	_update_height_demand(hgt_dem, baro_altitude);
+
+	// Detect underspeed condition
+	_detect_underspeed();
 
 	// Calculate specific energy quantitiues
 	_update_energies();

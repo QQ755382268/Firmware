@@ -2,13 +2,22 @@
 
 // 16 is max name length
 
+
 /**
- * Publish AGL as Z
+ * Enable local position estimator.
  *
- * @group Local Position Estimator
  * @boolean
+ * @group Local Position Estimator
  */
-PARAM_DEFINE_FLOAT(LPE_PUB_AGL_Z, 0);
+PARAM_DEFINE_INT32(LPE_ENABLED, 1);
+
+/**
+ * Enable accelerometer integration for prediction.
+ *
+ * @boolean
+ * @group Local Position Estimator
+ */
+PARAM_DEFINE_INT32(LPE_INTEGRATE, 1);
 
 /**
  * Optical flow z offset from center
@@ -22,26 +31,15 @@ PARAM_DEFINE_FLOAT(LPE_PUB_AGL_Z, 0);
 PARAM_DEFINE_FLOAT(LPE_FLW_OFF_Z, 0.0f);
 
 /**
- * Optical flow scale
+ * Optical flow xy standard deviation.
  *
  * @group Local Position Estimator
  * @unit m
- * @min 0.1
- * @max 10.0
- * @decimal 3
- */
-PARAM_DEFINE_FLOAT(LPE_FLW_SCALE, 1.3f);
-
-/**
- * Optical flow gyro compensation
- *
- * @group Local Position Estimator
- * @unit m
- * @min -1
+ * @min 0.01
  * @max 1
  * @decimal 3
  */
-PARAM_DEFINE_INT32(LPE_FLW_GYRO_CMP, 1);
+PARAM_DEFINE_FLOAT(LPE_FLW_XY, 0.01f);
 
 /**
  * Optical flow minimum quality threshold
@@ -51,7 +49,7 @@ PARAM_DEFINE_INT32(LPE_FLW_GYRO_CMP, 1);
  * @max 255
  * @decimal 0
  */
-PARAM_DEFINE_INT32(LPE_FLW_QMIN, 150);
+PARAM_DEFINE_INT32(LPE_FLW_QMIN, 75);
 
 /**
  * Sonar z standard deviation.
@@ -98,32 +96,34 @@ PARAM_DEFINE_FLOAT(LPE_LDR_Z, 0.03f);
 PARAM_DEFINE_FLOAT(LPE_LDR_OFF_Z, 0.00f);
 
 /**
- * Accelerometer xy noise density
+ * Accelerometer xy standard deviation
  *
- * Data sheet noise density = 150ug/sqrt(Hz) = 0.0015 m/s^2/sqrt(Hz)
+ * Data sheet sqrt(Noise power) = 150ug/sqrt(Hz)
+ * std dev = (150*9.8*1e-6)*sqrt(1000 Hz) m/s^2
+ * Since accels sampled at 1000 Hz.
  *
- * Larger than data sheet to account for tilt error.
+ * should be 0.0464
  *
  * @group Local Position Estimator
- * @unit m/s^2/srqt(Hz)
+ * @unit m/s^2
  * @min 0.00001
  * @max 2
  * @decimal 4
  */
-PARAM_DEFINE_FLOAT(LPE_ACC_XY, 0.012f);
+PARAM_DEFINE_FLOAT(LPE_ACC_XY, 0.0454f);
 
 /**
- * Accelerometer z noise density
+ * Accelerometer z standard deviation
  *
- * Data sheet noise density = 150ug/sqrt(Hz) = 0.0015 m/s^2/sqrt(Hz)
+ * (see Accel x comments)
  *
  * @group Local Position Estimator
- * @unit m/s^2/srqt(Hz)
+ * @unit m/s^2
  * @min 0.00001
  * @max 2
  * @decimal 4
  */
-PARAM_DEFINE_FLOAT(LPE_ACC_Z, 0.02f);
+PARAM_DEFINE_FLOAT(LPE_ACC_Z, 0.0454f);
 
 /**
  * Barometric presssure altitude z standard deviation.
@@ -134,15 +134,8 @@ PARAM_DEFINE_FLOAT(LPE_ACC_Z, 0.02f);
  * @max 3
  * @decimal 2
  */
-PARAM_DEFINE_FLOAT(LPE_BAR_Z, 3.0f);
+PARAM_DEFINE_FLOAT(LPE_BAR_Z, 1.0f);
 
-/**
- * Enables GPS data, also forces alt init with GPS
- *
- * @group Local Position Estimator
- * @boolean
- */
-PARAM_DEFINE_INT32(LPE_GPS_ON, 1);
 
 /**
  * GPS delay compensaton
@@ -153,11 +146,11 @@ PARAM_DEFINE_INT32(LPE_GPS_ON, 1);
  * @max 0.4
  * @decimal 2
  */
-PARAM_DEFINE_FLOAT(LPE_GPS_DELAY, 0.29f);
+PARAM_DEFINE_FLOAT(LPE_GPS_DELAY, 0.25f);
 
 
 /**
- * Minimum GPS xy standard deviation, uses reported EPH if greater.
+ * GPS xy standard deviation.
  *
  * @group Local Position Estimator
  * @unit m
@@ -165,10 +158,10 @@ PARAM_DEFINE_FLOAT(LPE_GPS_DELAY, 0.29f);
  * @max 5
  * @decimal 2
  */
-PARAM_DEFINE_FLOAT(LPE_GPS_XY, 1.0f);
+PARAM_DEFINE_FLOAT(LPE_GPS_XY, 2.0f);
 
 /**
- * Minimum GPS z standard deviation, uses reported EPV if greater.
+ * GPS z standard deviation.
  *
  * @group Local Position Estimator
  * @unit m
@@ -176,11 +169,10 @@ PARAM_DEFINE_FLOAT(LPE_GPS_XY, 1.0f);
  * @max 200
  * @decimal 2
  */
-PARAM_DEFINE_FLOAT(LPE_GPS_Z, 3.0f);
+PARAM_DEFINE_FLOAT(LPE_GPS_Z, 100.0f);
 
 /**
  * GPS xy velocity standard deviation.
- * EPV used if greater than this value.
  *
  * @group Local Position Estimator
  * @unit m/s
@@ -202,7 +194,7 @@ PARAM_DEFINE_FLOAT(LPE_GPS_VXY, 0.25f);
 PARAM_DEFINE_FLOAT(LPE_GPS_VZ, 0.25f);
 
 /**
- * Max EPH allowed for GPS initialization
+ * GPS max eph
  *
  * @group Local Position Estimator
  * @unit m
@@ -213,28 +205,6 @@ PARAM_DEFINE_FLOAT(LPE_GPS_VZ, 0.25f);
 PARAM_DEFINE_FLOAT(LPE_EPH_MAX, 3.0f);
 
 /**
- * Max EPV allowed for GPS initialization
- *
- * @group Local Position Estimator
- * @unit m
- * @min 1.0
- * @max 5.0
- * @decimal 3
- */
-PARAM_DEFINE_FLOAT(LPE_EPV_MAX, 5.0f);
-
-/**
- * Vision delay compensaton
- *
- * @group Local Position Estimator
- * @unit sec
- * @min 0
- * @max 0.1
- * @decimal 2
- */
-PARAM_DEFINE_FLOAT(LPE_VIS_DELAY, 0.1f);
-
-/**
  * Vision xy standard deviation.
  *
  * @group Local Position Estimator
@@ -243,7 +213,7 @@ PARAM_DEFINE_FLOAT(LPE_VIS_DELAY, 0.1f);
  * @max 1
  * @decimal 3
  */
-PARAM_DEFINE_FLOAT(LPE_VIS_XY, 0.1f);
+PARAM_DEFINE_FLOAT(LPE_VIS_XY, 0.5f);
 
 /**
  * Vision z standard deviation.
@@ -257,29 +227,30 @@ PARAM_DEFINE_FLOAT(LPE_VIS_XY, 0.1f);
 PARAM_DEFINE_FLOAT(LPE_VIS_Z, 0.5f);
 
 /**
- * Vision correction
+ * Circuit breaker to disable vision input.
+ *
+ * Set to the appropriate key (328754) to disable vision input.
  *
  * @group Local Position Estimator
- * @boolean
+ * @min 0
+ * @max 1
+ * @decimal 0
  */
-PARAM_DEFINE_INT32(LPE_VIS_ON, 1);
+PARAM_DEFINE_INT32(LPE_NO_VISION, 0);
 
 /**
  * Vicon position standard deviation.
  *
  * @group Local Position Estimator
  * @unit m
- * @min 0.0001
+ * @min 0.01
  * @max 1
- * @decimal 4
+ * @decimal 3
  */
-PARAM_DEFINE_FLOAT(LPE_VIC_P, 0.001f);
+PARAM_DEFINE_FLOAT(LPE_VIC_P, 0.05f);
 
 /**
  * Position propagation noise density
- *
- * Increase to trust measurements more.
- * Decrease to trust model more.
  *
  * @group Local Position Estimator
  * @unit m/s/sqrt(Hz)
@@ -291,9 +262,6 @@ PARAM_DEFINE_FLOAT(LPE_PN_P, 0.1f);
 
 /**
  * Velocity propagation noise density
- *
- * Increase to trust measurements more.
- * Decrease to trust model more.
  *
  * @group Local Position Estimator
  * @unit (m/s)/s/sqrt(Hz)
@@ -315,27 +283,15 @@ PARAM_DEFINE_FLOAT(LPE_PN_V, 0.1f);
 PARAM_DEFINE_FLOAT(LPE_PN_B, 1e-3f);
 
 /**
- * Terrain random walk noise density, hilly/outdoor (0.1), flat/Indoor (0.001)
+ * Terrain random walk noise density
  *
  * @group Local Position Estimator
- * @unit (m/s)/(sqrt(hz))
+ * @unit m/s/sqrt(Hz)
  * @min 0
  * @max 1
  * @decimal 3
  */
-PARAM_DEFINE_FLOAT(LPE_PN_T, 0.001f);
-
-/**
- * Terrain maximum percent grade, hilly/outdoor (100 = 45 deg), flat/Indoor (0 = 0 deg)
- * Used to calculate increased terrain random walk nosie due to movement.
- *
- * @group Local Position Estimator
- * @unit %
- * @min 0
- * @max 100
- * @decimal 3
- */
-PARAM_DEFINE_FLOAT(LPE_T_MAX_GRADE, 1.0f);
+PARAM_DEFINE_FLOAT(LPE_PN_T, 1e-3f);
 
 /**
  * Flow gyro high pass filter cut off frequency
@@ -346,70 +302,4 @@ PARAM_DEFINE_FLOAT(LPE_T_MAX_GRADE, 1.0f);
  * @max 2
  * @decimal 3
  */
-PARAM_DEFINE_FLOAT(LPE_FGYRO_HP, 0.001f);
-
-/**
- * Local origin latitude for nav w/o GPS
- *
- * @group Local Position Estimator
- * @unit deg
- * @min -90
- * @max 90
- * @decimal 8
- */
-PARAM_DEFINE_FLOAT(LPE_LAT, 40.430f);
-
-/**
- * Local origin longitude for nav w/o GPS
- *
- * @group Local Position Estimator
- * @unit deg
- * @min -180
- * @max 180
- * @decimal 8
- */
-PARAM_DEFINE_FLOAT(LPE_LON, -86.929);
-
-/**
- * Cut frequency for state publication
- *
- * @group Local Position Estimator
- * @unit Hz
- * @min 5
- * @max 1000
- * @decimal 0
- */
-PARAM_DEFINE_FLOAT(LPE_X_LP, 5.0f);
-
-/**
- * Required velocity xy standard deviation to publish position
- *
- * @group Local Position Estimator
- * @unit m/s
- * @min 0.01
- * @max 1.0
- * @decimal 3
- */
-PARAM_DEFINE_FLOAT(LPE_VXY_PUB, 0.3f);
-
-/**
- * Required z standard deviation to publish altitude/ terrain
- *
- * @group Local Position Estimator
- * @unit m
- * @min 0.3
- * @max 5.0
- * @decimal 1
- */
-PARAM_DEFINE_FLOAT(LPE_Z_PUB, 1.0f);
-
-/**
- * Land detector z standard deviation
- *
- * @group Local Position Estimator
- * @unit m
- * @min 0.001
- * @max 10.0
- * @decimal 3
- */
-PARAM_DEFINE_FLOAT(LPE_LAND_Z, 0.03f);
+PARAM_DEFINE_FLOAT(LPE_FGYRO_HP, 0.1f);

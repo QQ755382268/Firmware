@@ -124,9 +124,11 @@ DataLinkLoss::set_dll_item()
 		_mission_item.altitude = _param_commsholdalt.get();
 		_mission_item.yaw = NAN;
 		_mission_item.loiter_radius = _navigator->get_loiter_radius();
+		_mission_item.loiter_direction = 1;
 		_mission_item.nav_cmd = NAV_CMD_LOITER_TIME_LIMIT;
 		_mission_item.acceptance_radius = _navigator->get_acceptance_radius();
 		_mission_item.time_inside = _param_commsholdwaittime.get() < 0.0f ? 0.0f : _param_commsholdwaittime.get();
+		_mission_item.pitch_min = 0.0f;
 		_mission_item.autocontinue = true;
 		_mission_item.origin = ORIGIN_ONBOARD;
 
@@ -140,9 +142,11 @@ DataLinkLoss::set_dll_item()
 		_mission_item.altitude = _param_airfieldhomealt.get();
 		_mission_item.yaw = NAN;
 		_mission_item.loiter_radius = _navigator->get_loiter_radius();
+		_mission_item.loiter_direction = 1;
 		_mission_item.nav_cmd = NAV_CMD_LOITER_TIME_LIMIT;
 		_mission_item.time_inside = _param_airfieldhomewaittime.get() < 0.0f ? 0.0f : _param_airfieldhomewaittime.get();
 		_mission_item.acceptance_radius = _navigator->get_acceptance_radius();
+		_mission_item.pitch_min = 0.0f;
 		_mission_item.autocontinue = true;
 		_mission_item.origin = ORIGIN_ONBOARD;
 

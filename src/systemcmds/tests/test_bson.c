@@ -37,6 +37,7 @@
  * Tests for the bson en/decoder
  */
 
+#define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 
 #include <px4_defines.h>
@@ -49,7 +50,7 @@
 #include <systemlib/err.h>
 #include <systemlib/bson/tinybson.h>
 
-#include "tests_main.h"
+#include "tests.h"
 
 static const bool sample_bool = true;
 static const int32_t sample_small_int = 123;

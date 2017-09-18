@@ -59,14 +59,12 @@ struct Params {
 	float arsp_lp_gain;			// total airspeed estimate low pass gain
 	int vtol_type;
 	int elevons_mc_lock;		// lock elevons in multicopter mode
-	float fw_min_alt;			// minimum relative altitude for FW mode (QuadChute)
 };
 
 enum mode {
 	ROTARY_WING = 0,
 	FIXED_WING,
-	TRANSITION_TO_FW,
-	TRANSITION_TO_MC,
+	TRANSITION,
 	EXTERNAL
 };
 
@@ -83,8 +81,6 @@ class VtolType
 public:
 
 	VtolType(VtolAttitudeControl *att_controller);
-	VtolType(const VtolType &) = delete;
-	VtolType &operator=(const VtolType &) = delete;
 
 	virtual ~VtolType();
 
@@ -124,16 +120,6 @@ public:
 	 */
 	virtual void waiting_on_tecs() {};
 
-	/**
-	 * Checks for fixed-wing failsafe condition and issues abort request if needed.
-	 */
-	void check_quadchute_condition();
-
-	/**
-	 * Returns true if we're allowed to do a mode transition on the ground.
-	 */
-	bool can_transition_on_ground();
-
 	void set_idle_mc();
 	void set_idle_fw();
 
@@ -161,14 +147,13 @@ protected:
 	struct vehicle_local_position_s			*_local_pos;
 	struct airspeed_s 				*_airspeed;					// airspeed
 	struct battery_status_s 			*_batt_status; 				// battery status
+	struct vehicle_status_s 			*_vehicle_status;			// vehicle status from commander app
 	struct tecs_status_s				*_tecs_status;
-	struct vehicle_land_detected_s			*_land_detected;
 
 	struct Params 					*_params;
 
 	bool flag_idle_mc = true;		//false = "idle is set for fixed wing mode"; true = "idle is set for multicopter mode"
 
-	bool _pusher_active = false;
 	float _mc_roll_weight = 1.0f;	// weight for multicopter attitude controller roll output
 	float _mc_pitch_weight = 1.0f;	// weight for multicopter attitude controller pitch output
 	float _mc_yaw_weight = 1.0f;	// weight for multicopter attitude controller yaw output

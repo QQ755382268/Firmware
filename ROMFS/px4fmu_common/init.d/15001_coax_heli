@@ -1,6 +1,6 @@
 #!nsh
 #
-# @name Esky (Big) Lama v4
+# @name Coaxial Helicopter (such as Esky Lama v4 or Esky Big Lama)
 #
 # @type Coaxial Helicopter
 # 
@@ -12,11 +12,15 @@
 # @maintainer Emmanuel Roussel
 #
 
-sh /etc/init.d/rc.mc_defaults
-set MIXER coax
+set VEHICLE_TYPE mc
 
 if [ $AUTOCNF == yes ]
 then
+	param set PE_VELNE_NOISE 0.5
+	param set PE_VELD_NOISE 0.35
+	param set PE_POSNE_NOISE 0.5
+	param set PE_POSD_NOISE 1.25
+
 	param set NAV_ACC_RAD 2.0
 	param set RTL_RETURN_ALT 30.0
 	param set RTL_DESCEND_ALT 10.0
@@ -43,6 +47,7 @@ then
 	param set MC_YAWRATE_FF 0
 fi
 
+set MIXER coax
 # use PWM parameters for throttle channel
 set PWM_OUT 34
 set PWM_RATE 400
@@ -57,3 +62,4 @@ set PWM_AUX_OUT 1234
 set PWM_AUX_DISARMED 1500
 set PWM_AUX_MIN 1000
 set PWM_AUX_MAX 2000
+

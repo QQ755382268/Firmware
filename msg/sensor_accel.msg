@@ -1,3 +1,4 @@
+uint64 timestamp
 uint64 integral_dt	# integration time
 uint64 error_count
 float32 x		# acceleration in the NED X board axis in m/s^2

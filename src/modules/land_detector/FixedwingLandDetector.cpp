@@ -31,38 +31,38 @@
  *
  ****************************************************************************/
 
-/*
+/**
  * @file FixedwingLandDetector.cpp
+ * Land detection algorithm for fixedwings
  *
  * @author Johan Jansen <jnsn.johan@gmail.com>
  * @author Lorenz Meier <lorenz@px4.io>
- * @author Julian Oes <julian@oes.ch>
  */
+
+#include "FixedwingLandDetector.h"
 
 #include <px4_config.h>
 #include <px4_defines.h>
 #include <cmath>
 #include <drivers/drv_hrt.h>
 
-#include "FixedwingLandDetector.h"
-
-
-namespace land_detector
-{
-
 FixedwingLandDetector::FixedwingLandDetector() : LandDetector(),
 	_paramHandle(),
 	_params(),
 	_controlStateSub(-1),
+	_vehicleStatusSub(-1),
 	_armingSub(-1),
 	_airspeedSub(-1),
 	_controlState{},
+	_vehicleStatus{},
 	_arming{},
 	_airspeed{},
+	_parameterSub(-1),
 	_velocity_xy_filtered(0.0f),
 	_velocity_z_filtered(0.0f),
 	_airspeed_filtered(0.0f),
-	_accel_horz_lp(0.0f)
+	_accel_horz_lp(0.0f),
+	_landDetectTrigger(0)
 {
 	_paramHandle.maxVelocity = param_find("LNDFW_VEL_XY_MAX");
 	_paramHandle.maxClimbRate = param_find("LNDFW_VEL_Z_MAX");
@@ -70,41 +70,35 @@ FixedwingLandDetector::FixedwingLandDetector() : LandDetector(),
 	_paramHandle.maxIntVelocity = param_find("LNDFW_VELI_MAX");
 }
 
-void FixedwingLandDetector::_initialize_topics()
+void FixedwingLandDetector::initialize()
 {
 	_controlStateSub = orb_subscribe(ORB_ID(control_state));
+	_vehicleStatusSub = orb_subscribe(ORB_ID(vehicle_status));
 	_armingSub = orb_subscribe(ORB_ID(actuator_armed));
 	_airspeedSub = orb_subscribe(ORB_ID(airspeed));
+
+	updateParameterCache(true);
 }
 
-void FixedwingLandDetector::_update_topics()
+void FixedwingLandDetector::updateSubscriptions()
 {
-	_orb_update(ORB_ID(control_state), _controlStateSub, &_controlState);
-	_orb_update(ORB_ID(actuator_armed), _armingSub, &_arming);
-	_orb_update(ORB_ID(airspeed), _airspeedSub, &_airspeed);
+	orb_update(ORB_ID(control_state), _controlStateSub, &_controlState);
+	orb_update(ORB_ID(vehicle_status), _vehicleStatusSub, &_vehicleStatus);
+	orb_update(ORB_ID(actuator_armed), _armingSub, &_arming);
+	orb_update(ORB_ID(airspeed), _airspeedSub, &_airspeed);
 }
 
-void FixedwingLandDetector::_update_params()
+bool FixedwingLandDetector::update()
 {
-	param_get(_paramHandle.maxVelocity, &_params.maxVelocity);
-	param_get(_paramHandle.maxClimbRate, &_params.maxClimbRate);
-	param_get(_paramHandle.maxAirSpeed, &_params.maxAirSpeed);
-	param_get(_paramHandle.maxIntVelocity, &_params.maxIntVelocity);
-}
+	// First poll for new data from our subscriptions
+	updateSubscriptions();
 
-bool FixedwingLandDetector::_get_freefall_state()
-{
-	// TODO
-	return false;
-}
-
-bool FixedwingLandDetector::_get_landed_state()
-{
 	// only trigger flight conditions if we are armed
 	if (!_arming.armed) {
 		return true;
 	}
 
+	const uint64_t now = hrt_absolute_time();
 	bool landDetected = false;
 
 	if (hrt_elapsed_time(&_controlState.timestamp) < 500 * 1000) {
@@ -133,10 +127,14 @@ bool FixedwingLandDetector::_get_landed_state()
 		    && _airspeed_filtered < _params.maxAirSpeed
 		    && _accel_horz_lp < _params.maxIntVelocity) {
 
-			landDetected = true;
+			// these conditions need to be stable for a period of time before we trust them
+			if (now > _landDetectTrigger) {
+				landDetected = true;
+			}
 
 		} else {
-			landDetected = false;
+			// reset land detect trigger
+			_landDetectTrigger = now + LAND_DETECTOR_TRIGGER_TIME;
 		}
 
 	} else {
@@ -147,4 +145,21 @@ bool FixedwingLandDetector::_get_landed_state()
 	return landDetected;
 }
 
-} // namespace land_detector
+void FixedwingLandDetector::updateParameterCache(const bool force)
+{
+	bool updated;
+	parameter_update_s paramUpdate;
+
+	orb_check(_parameterSub, &updated);
+
+	if (updated) {
+		orb_copy(ORB_ID(parameter_update), _parameterSub, &paramUpdate);
+	}
+
+	if (updated || force) {
+		param_get(_paramHandle.maxVelocity, &_params.maxVelocity);
+		param_get(_paramHandle.maxClimbRate, &_params.maxClimbRate);
+		param_get(_paramHandle.maxAirSpeed, &_params.maxAirSpeed);
+		param_get(_paramHandle.maxIntVelocity, &_params.maxIntVelocity);
+	}
+}

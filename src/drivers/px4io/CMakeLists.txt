@@ -33,8 +33,9 @@
 px4_add_module(
 	MODULE drivers__px4io
 	MAIN px4io
-	STACK_MAIN 1800
+	STACK 1800
 	COMPILE_FLAGS
+		-Os
 	SRCS
 		px4io.cpp
 		px4io_uploader.cpp
@@ -44,4 +45,4 @@ px4_add_module(
 	DEPENDS
 		platforms__common
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :
+# vim: set noet ft=cmake fenc=utf-8 ff=unix : 

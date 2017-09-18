@@ -52,19 +52,11 @@
 
 using namespace DriverFramework;
 
-#if defined(__PX4_QURT) || defined(__PX4_POSIX_RPI) || defined(__PX4_POSIX_BEBOP)
-
-// Sensor initialization is performed automatically when the QuRT sensor drivers
-// are loaded.
-// The same is true for the Raspberry Pi.
-
-int
-sensors_init(void)
-{
-	return 0;
-}
-
-#else
+/* oddly, ERROR is not defined for c++ */
+#ifdef ERROR
+# undef ERROR
+#endif
+static const int ERROR = -1;
 
 /**
  * Do accel-related initialisation.
@@ -91,25 +83,24 @@ int
 sensors_init(void)
 {
 	int ret;
-	int ret_combined = 0;
 
 	ret = accel_init();
 
-	if (ret) { ret_combined = ret; }
+	if (ret) { return ret; }
 
 	ret = gyro_init();
 
-	if (ret) { ret_combined = ret; }
+	if (ret) { return ret; }
 
 	ret = mag_init();
 
-	if (ret) { ret_combined = ret; }
+	if (ret) { return ret; }
 
 	ret = baro_init();
 
-	if (ret) { ret_combined = ret; }
+	if (ret) { return ret; }
 
-	return ret_combined;
+	return 0;
 }
 
 
@@ -121,7 +112,7 @@ accel_init()
 
 	if (!h_accel.isValid()) {
 		warnx("FATAL: no accelerometer found: %s (%d)", ACCEL0_DEVICE_PATH, h_accel.getError());
-		return PX4_ERROR;
+		return ERROR;
 
 	} else {
 
@@ -143,7 +134,7 @@ gyro_init()
 
 	if (!h_gyro.isValid()) {
 		warnx("FATAL: no gyro found: %s (%d)", GYRO0_DEVICE_PATH, h_gyro.getError());
-		return PX4_ERROR;
+		return ERROR;
 
 	}
 
@@ -166,7 +157,7 @@ mag_init()
 
 	if (!h_mag.isValid()) {
 		warnx("FATAL: no magnetometer found: %s (%d)", MAG0_DEVICE_PATH, h_mag.getError());
-		return PX4_ERROR;
+		return ERROR;
 	}
 
 	/* try different mag sampling rates */
@@ -188,7 +179,7 @@ mag_init()
 
 		} else {
 			warnx("FATAL: mag sampling rate could not be set");
-			return PX4_ERROR;
+			return ERROR;
 		}
 	}
 
@@ -203,7 +194,7 @@ baro_init()
 
 	if (!h_baro.isValid()) {
 		warnx("FATAL: No barometer found: %s (%d)", BARO0_DEVICE_PATH, h_baro.getError());
-		return PX4_ERROR;
+		return ERROR;
 	}
 
 	/* set the driver to poll at 150Hz */
@@ -212,4 +203,3 @@ baro_init()
 	return OK;
 }
 
-#endif

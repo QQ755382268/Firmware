@@ -43,7 +43,6 @@
 #include <uORB/topics/manual_control_setpoint.h>
 #include <uORB/topics/actuator_outputs.h>
 #include <uORB/topics/vehicle_attitude.h>
-#include <uORB/topics/vehicle_global_position.h>
 #include <uORB/topics/vehicle_status.h>
 #include <uORB/topics/battery_status.h>
 #include <drivers/drv_accel.h>
@@ -53,13 +52,10 @@
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_rc_input.h>
 #include <systemlib/perf_counter.h>
-#include <systemlib/battery.h>
 #include <uORB/uORB.h>
 #include <uORB/topics/optical_flow.h>
-#include <uORB/topics/distance_sensor.h>
 #include <v1.0/mavlink_types.h>
 #include <v1.0/common/mavlink.h>
-#include <geo/geo.h>
 namespace simulator
 {
 
@@ -241,42 +237,24 @@ private:
 		_gyro_pub(nullptr),
 		_mag_pub(nullptr),
 		_flow_pub(nullptr),
-		_dist_pub(nullptr),
 		_battery_pub(nullptr),
-		_initialized(false),
-		_system_type(0)
+		_initialized(false)
 #ifndef __PX4_QURT
 		,
 		_rc_channels_pub(nullptr),
-		_attitude_pub(nullptr),
-		_gpos_pub(nullptr),
-		_actuator_outputs_sub{},
+		_actuator_outputs_sub(-1),
 		_vehicle_attitude_sub(-1),
 		_manual_sub(-1),
 		_vehicle_status_sub(-1),
-		_hil_local_proj_ref(),
-		_hil_local_proj_inited(false),
-		_hil_ref_lat(0),
-		_hil_ref_lon(0),
-		_hil_ref_alt(0),
-		_hil_ref_timestamp(0),
 		_rc_input{},
 		_actuators{},
 		_attitude{},
 		_manual{},
-		_vehicle_status{}
+		_vehicle_status{},
+		_battery_last_timestamp(0),
+		_battery_mamphour_total(0.0f)
 #endif
-	{
-		// We need to know the type for the correct mapping from
-		// actuator controls to the hil actuator message.
-		param_t param_system_type = param_find("MAV_TYPE");
-		param_get(param_system_type, &_system_type);
-
-		for (unsigned i = 0; i < (sizeof(_actuator_outputs_sub) / sizeof(_actuator_outputs_sub[0])); i++)
-		{
-			_actuator_outputs_sub[i] = -1;
-		}
-	}
+	{}
 	~Simulator() { _instance = NULL; }
 
 	void initializeSensorData();
@@ -306,56 +284,39 @@ private:
 	orb_advert_t _gyro_pub;
 	orb_advert_t _mag_pub;
 	orb_advert_t _flow_pub;
-	orb_advert_t _dist_pub;
 	orb_advert_t _battery_pub;
 
 	bool _initialized;
 
-	// Lib used to do the battery calculations.
-	Battery _battery;
-
-	// For param MAV_TYPE
-	int32_t _system_type;
-
 	// class methods
 	int publish_sensor_topics(mavlink_hil_sensor_t *imu);
 	int publish_flow_topic(mavlink_hil_optical_flow_t *flow);
-	int publish_distance_topic(mavlink_distance_sensor_t *dist);
 
 #ifndef __PX4_QURT
 	// uORB publisher handlers
 	orb_advert_t _rc_channels_pub;
-	orb_advert_t _attitude_pub;
-	orb_advert_t _gpos_pub;
-	orb_advert_t _lpos_pub;
 
 	// uORB subscription handlers
-	int _actuator_outputs_sub[ORB_MULTI_MAX_INSTANCES];
+	int _actuator_outputs_sub;
 	int _vehicle_attitude_sub;
 	int _manual_sub;
 	int _vehicle_status_sub;
 
-	// hil map_ref data
-	struct map_projection_reference_s _hil_local_proj_ref;
-	bool _hil_local_proj_inited;
-	double _hil_ref_lat;
-	double _hil_ref_lon;
-	float _hil_ref_alt;
-	uint64_t _hil_ref_timestamp;
-
 	// uORB data containers
 	struct rc_input_values _rc_input;
-	struct actuator_outputs_s _actuators[ORB_MULTI_MAX_INSTANCES];
+	struct actuator_outputs_s _actuators;
 	struct vehicle_attitude_s _attitude;
 	struct manual_control_setpoint_s _manual;
 	struct vehicle_status_s _vehicle_status;
+	uint64_t _battery_last_timestamp;
+	float _battery_mamphour_total;
 
 	void poll_topics();
 	void handle_message(mavlink_message_t *msg, bool publish);
 	void send_controls();
-	void pollForMAVLinkMessages(bool publish, int udp_port);
+	void pollForMAVLinkMessages(bool publish);
 
-	void pack_actuator_message(mavlink_hil_actuator_controls_t &actuator_msg, unsigned index);
+	void pack_actuator_message(mavlink_hil_controls_t &actuator_msg);
 	void send_mavlink_message(const uint8_t msgid, const void *msg, uint8_t component_ID);
 	void update_sensors(mavlink_hil_sensor_t *imu);
 	void update_gps(mavlink_hil_gps_t *gps_sim);

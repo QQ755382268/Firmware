@@ -37,7 +37,6 @@
 
 #include "mag.hpp"
 
-#include <drivers/drv_hrt.h>
 #include <systemlib/err.h>
 
 const char *const UavcanMagnetometerBridge::NAME = "mag";

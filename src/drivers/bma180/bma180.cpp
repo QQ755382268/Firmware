@@ -37,7 +37,6 @@
  */
 
 #include <px4_config.h>
-#include <px4_defines.h>
 
 #include <sys/types.h>
 #include <stdint.h>
@@ -66,8 +65,12 @@
 #include <drivers/drv_accel.h>
 #include <drivers/device/ringbuffer.h>
 
-#define ACCEL_DEVICE_PATH	"/dev/bma180"
 
+/* oddly, ERROR is not defined for c++ */
+#ifdef ERROR
+# undef ERROR
+#endif
+static const int ERROR = -1;
 
 #define DIR_READ			(1<<7)
 #define DIR_WRITE			(0<<7)
@@ -144,7 +147,7 @@ private:
 	struct hrt_call		_call;
 	unsigned		_call_interval;
 
-	ringbuffer::RingBuffer		*_reports;
+	RingBuffer		*_reports;
 
 	struct accel_calibration_s	_accel_scale;
 	float			_accel_range_scale;
@@ -270,7 +273,7 @@ BMA180::~BMA180()
 int
 BMA180::init()
 {
-	int ret = PX4_ERROR;
+	int ret = ERROR;
 
 	/* do SPI init (and probe) first */
 	if (SPI::init() != OK) {
@@ -278,7 +281,7 @@ BMA180::init()
 	}
 
 	/* allocate basic report buffers */
-	_reports = new ringbuffer::RingBuffer(2, sizeof(accel_report));
+	_reports = new RingBuffer(2, sizeof(accel_report));
 
 	if (_reports == nullptr) {
 		goto out;
@@ -316,7 +319,7 @@ BMA180::init()
 		ret = OK;
 
 	} else {
-		ret = PX4_ERROR;
+		ret = ERROR;
 	}
 
 	_class_instance = register_class_devname(ACCEL_DEVICE_PATH);
@@ -460,14 +463,14 @@ BMA180::ioctl(struct file *filp, int cmd, unsigned long arg)
 				return -EINVAL;
 			}
 
-			irqstate_t flags = px4_enter_critical_section();
+			irqstate_t flags = irqsave();
 
 			if (!_reports->resize(arg)) {
-				px4_leave_critical_section(flags);
+				irqrestore(flags);
 				return -ENOMEM;
 			}
 
-			px4_leave_critical_section(flags);
+			irqrestore(flags);
 
 			return OK;
 		}
@@ -785,7 +788,7 @@ start()
 	}
 
 	/* create the driver */
-	g_dev = new BMA180(1 /* XXX magic number */, (spi_dev_e)PX4_SPIDEV_BMA);
+	g_dev = new BMA180(1 /* XXX magic number */, (spi_dev_e)PX4_SPIDEV_ACCEL);
 
 	if (g_dev == nullptr) {
 		goto fail;

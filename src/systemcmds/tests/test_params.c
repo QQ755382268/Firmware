@@ -41,22 +41,18 @@
 #include <stdio.h>
 #include "systemlib/err.h"
 #include "systemlib/param/param.h"
-#include "tests_main.h"
+#include "tests.h"
 
-#define PARAM_MAGIC1 12345678
+#define PARAM_MAGIC1 0x12345678
 #define PARAM_MAGIC2 0xa5a5a5a5
-
-/**
- * @group Testing
- */
-PARAM_DEFINE_INT32(TEST_PARAMS, 12345678);
+PARAM_DEFINE_INT32(test, PARAM_MAGIC1);
 
 int
 test_param(int argc, char *argv[])
 {
 	param_t		p;
 
-	p = param_find("TEST_PARAMS");
+	p = param_find("test");
 
 	if (p == PARAM_INVALID) {
 		warnx("test parameter not found");
@@ -75,7 +71,7 @@ test_param(int argc, char *argv[])
 		return 1;
 	}
 
-	int32_t	val = -1;
+	int32_t	val;
 
 	if (param_get(p, &val) != OK) {
 		warnx("failed to read test parameter");

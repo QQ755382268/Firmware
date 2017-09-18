@@ -45,9 +45,13 @@
 #include "LidarLitePWM.h"
 #include <stdio.h>
 #include <string.h>
-#include <px4_defines.h>
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_pwm_input.h>
+
+/* oddly, ERROR is not defined for c++ */
+#ifdef __cplusplus
+static const int ERROR = -1;
+#endif
 
 LidarLitePWM::LidarLitePWM(const char *path) :
 	CDev("LidarLitePWM", path),
@@ -91,15 +95,15 @@ int LidarLitePWM::init()
 	/* do regular cdev init */
 	int ret = CDev::init();
 
-	if (ret != PX4_OK) {
-		return PX4_ERROR;
+	if (ret != OK) {
+		return ERROR;
 	}
 
 	/* allocate basic report buffers */
 	_reports = new ringbuffer::RingBuffer(2, sizeof(struct distance_sensor_s));
 
 	if (_reports == nullptr) {
-		return PX4_ERROR;
+		return ERROR;
 	}
 
 	_class_instance = register_class_devname(RANGE_FINDER_BASE_DEVICE_PATH);
@@ -115,7 +119,7 @@ int LidarLitePWM::init()
 		DEVICE_DEBUG("failed to create distance_sensor object. Did you start uOrb?");
 	}
 
-	return PX4_OK;
+	return OK;
 }
 
 void LidarLitePWM::print_info()
@@ -168,11 +172,11 @@ int LidarLitePWM::measure()
 {
 	perf_begin(_sample_perf);
 
-	if (PX4_OK != collect()) {
+	if (OK != collect()) {
 		DEVICE_DEBUG("collection error");
 		perf_count(_read_errors);
 		perf_end(_sample_perf);
-		return PX4_ERROR;
+		return ERROR;
 	}
 
 	_range.timestamp = hrt_absolute_time();
@@ -202,7 +206,7 @@ int LidarLitePWM::measure()
 
 	poll_notify(POLLIN);
 	perf_end(_sample_perf);
-	return PX4_OK;
+	return OK;
 }
 
 ssize_t LidarLitePWM::read(struct file *filp, char *buffer, size_t buflen)
@@ -262,12 +266,12 @@ int LidarLitePWM::collect()
 	int fd = ::open(PWMIN0_DEVICE_PATH, O_RDONLY);
 
 	if (fd == -1) {
-		return PX4_ERROR;
+		return ERROR;
 	}
 
 	if (::read(fd, &_pwm, sizeof(_pwm)) == sizeof(_pwm)) {
 		::close(fd);
-		return PX4_OK;
+		return OK;
 	}
 
 	::close(fd);
@@ -280,7 +284,7 @@ int LidarLitePWM::reset_sensor()
 	int fd = ::open(PWMIN0_DEVICE_PATH, O_RDONLY);
 
 	if (fd == -1) {
-		return PX4_ERROR;
+		return ERROR;
 	}
 
 	int ret = ::ioctl(fd, SENSORIOCRESET, 0);

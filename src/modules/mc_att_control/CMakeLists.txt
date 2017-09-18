@@ -30,15 +30,17 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 ############################################################################
+if (${OS} STREQUAL "nuttx")
+	list(APPEND MODULE_CFLAGS -Wframe-larger-than=3500)
+endif()
 px4_add_module(
 	MODULE modules__mc_att_control
 	MAIN mc_att_control
-	STACK_MAIN 1200
-	STACK_MAX 3500
-	COMPILE_FLAGS
+	STACK 1200
+	COMPILE_FLAGS ${MODULE_CFLAGS}
 	SRCS
 		mc_att_control_main.cpp
 	DEPENDS
 		platforms__common
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :
+# vim: set noet ft=cmake fenc=utf-8 ff=unix : 

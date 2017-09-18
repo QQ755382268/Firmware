@@ -34,11 +34,12 @@ px4_add_module(
 	MODULE systemcmds__nshterm
 	MAIN nshterm
 	PRIORITY "SCHED_PRIORITY_DEFAULT-30"
-	STACK_MAIN 1500
+	STACK 1500
 	COMPILE_FLAGS
+		-Os
 	SRCS
 		nshterm.c
 	DEPENDS
 		platforms__common
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :
+# vim: set noet ft=cmake fenc=utf-8 ff=unix : 

@@ -1,6 +1,6 @@
 #!nsh
 #
-# Standard startup script for PX4FMU v1, v2, v3, v4 onboard sensor drivers.
+# Standard startup script for PX4FMU v1, v2, v3 onboard sensor drivers.
 #
 
 if ver hwcmp PX4FMU_V1
@@ -8,30 +8,11 @@ then
 	if ms5611 start
 	then
 	fi
-
 else
-	if ver hwcmp CRAZYFLIE
-	then
-	# Crazyflie uses separate driver
-	else
-
 	# Configure all I2C buses to 100 KHz as they
 	# are all external or slow
 	fmu i2c 1 100000
 	fmu i2c 2 100000
-
-	fi
-
-	if ver hwcmp PX4FMU_V4
-	then
-		# We know there are sketchy boards out there
-		# as chinese companies produce Pixracers without
-		# fully understanding the critical parts of the
-		# schematic and BOM, leading to sensor brownouts
-		# on boot. Original Pixracers following the
-		# open hardware design do not require this.
-		fmu sensor_reset 50
-	fi
 
 	if ms5611 -s start
 	then
@@ -54,18 +35,8 @@ then
 	then
 	fi
 
-	# External I2C bus
-	if lis3mdl -X start
-	then
-	fi
-
 	# Internal I2C bus
 	if hmc5883 -C -T -I -R 4 start
-	then
-	fi
-
-	# Internal SPI bus ICM-20608-G
-	if mpu6000 -T 20608 start
 	then
 	fi
 
@@ -74,13 +45,7 @@ then
 	then
 		set BOARD_FMUV3 true
 	else
-		# Check for Pixhawk 2 board
-		if mpu9250 -S -R 4 start
-		then
-			set BOARD_FMUV3 true
-		else
-			set BOARD_FMUV3 false
-		fi
+		set BOARD_FMUV3 false
 	fi
 
 	if [ $BOARD_FMUV3 == true ]
@@ -98,27 +63,15 @@ then
 		# internal MPU6000 is rotated 180 deg roll, 270 deg yaw
 		if mpu6000 -R 14 start
 		then
-		else
-			if mpu9250 -R 14 start
-			then
-			fi
 		fi
 
 		if hmc5883 -C -T -S -R 8 start
 		then
 		fi
 
-		if meas_airspeed start -b 2
-		then
-		fi
-
 	else
 		# FMUv2
 		if mpu6000 start
-		then
-		fi
-
-		if mpu9250 start
 		then
 		fi
 
@@ -130,103 +83,58 @@ then
 		then
 		fi
 	fi
-fi
-
-if ver hwcmp PX4FMU_V4
-then
-	# External I2C bus
-	if hmc5883 -C -T -X start
+else
+	if ver hwcmp PX4FMU_V4
 	then
-	fi
+		# External I2C bus
+		if hmc5883 -C -T -X start
+		then
+		fi
 
-	if lis3mdl -R 2 start
-	then
-	fi
+		# Internal SPI bus is rotated 90 deg yaw
+		if hmc5883 -C -T -S -R 2 start
+		then
+		fi
 
-	# Internal SPI bus is rotated 90 deg yaw
-	if hmc5883 -C -T -S -R 2 start
-	then
-	fi
+		# Internal SPI bus ICM-20608-G is rotated 90 deg yaw
+		if mpu6000 -R 2 -T 20608 start
+		then
+		fi
 
-	# Internal SPI bus ICM-20608-G is rotated 90 deg yaw
-	if mpu6000 -R 2 -T 20608 start
-	then
-	fi
-
-	# Internal SPI bus mpu9250 is rotated 90 deg yaw
-	if mpu9250 -R 2 start
-	then
-	fi
-fi
-
-if ver hwcmp PX4FMU_V1
-then
-	# FMUv1
-	if mpu6000 start
-	then
-	fi
-
-	if l3gd20 start
-	then
-	fi
-
-	# MAG selection
-	if param compare SENS_EXT_MAG 2
-	then
-		if hmc5883 -C -I start
+		# Internal SPI bus mpu9250 is rotated 90 deg yaw
+		if mpu9250 -R 2 start
 		then
 		fi
 	else
-		# Use only external as primary
-		if param compare SENS_EXT_MAG 1
+		# FMUv1
+		if mpu6000 start
 		then
-			if hmc5883 -C -X start
+		fi
+
+		if l3gd20 start
+		then
+		fi
+
+		# MAG selection
+		if param compare SENS_EXT_MAG 2
+		then
+			if hmc5883 -C -I start
 			then
 			fi
 		else
-		# auto-detect the primary, prefer external
-			if hmc5883 start
+			# Use only external as primary
+			if param compare SENS_EXT_MAG 1
 			then
+				if hmc5883 -C -X start
+				then
+				fi
+			else
+			# auto-detect the primary, prefer external
+				if hmc5883 start
+				then
+				fi
 			fi
 		fi
-	fi
-fi
-
-if ver hwcmp MINDPX_V2
-then
-	# External I2C bus
-	if hmc5883 -C -T -X start
-	then
-	fi
-
-	# Internal I2C bus
-	if hmc5883 -C -T -I -R 8 start
-	then
-	fi
-
-	if mpu6500 -R 8 start
-	then
-	fi
-
-	if lsm303d -R 10 start
-	then
-	fi
-
-	if l3gd20 -R 14 start
-	then
-	fi
-fi
-
-if ver hwcmp CRAZYFLIE
-then
-	# Onboard I2C
-	if mpu9250 -R 12 start
-	then
-	fi
-
-	# I2C bypass of mpu 
-	if lps25h start
-	then
 	fi
 fi
 
@@ -238,11 +146,16 @@ else
 	else
 		if ets_airspeed start -b 1
 		then
+		else
+			if [ $BOARD_FMUV3 == true ]
+			then
+				meas_airspeed start -b 2
+			fi
 		fi
 	fi
 fi
 
-if sf1xx start
+if sf10a start
 then
 fi
 

@@ -34,8 +34,6 @@ then
 	param set MC_YAWRATE_I 0.04
 	param set MC_YAWRATE_D 0.0
 	param set MC_YAWRATE_FF 0.0
-	param set MC_YAWRATE_MAX 40.0
-	param set MC_YAWRAUTO_MAX 40.0
 
 	param set MPC_ACC_HOR_MAX 2.0
 	param set MPC_Z_VEL_MAX 1.5
@@ -53,10 +51,6 @@ then
 	param set VT_ARSP_TRANS 15.0
 	param set VT_ARSP_BLEND 8.0
 	param set VT_B_TRANS_DUR 4.0
-
-	param set VT_MOT_COUNT 4
-	param set VT_IDLE_PWM_MC 1080
-	param set VT_TYPE 2
 fi
 
 set MIXER vtol_quad_x
@@ -68,3 +62,7 @@ set PWM_ACHDIS 5
 set PWM_AUX_DISARMED 950
 
 set MAV_TYPE 22
+
+param set VT_MOT_COUNT 4
+param set VT_IDLE_PWM_MC 1080
+param set VT_TYPE 2

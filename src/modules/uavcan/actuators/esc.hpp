@@ -64,8 +64,6 @@ public:
 	void arm_all_escs(bool arm);
 	void arm_single_esc(int num, bool arm);
 
-	void enable_idle_throttle_when_armed(bool value) { _run_at_idle_throttle_when_armed = value; }
-
 private:
 	/**
 	 * ESC status message reception will be reported via this callback.
@@ -90,7 +88,6 @@ private:
 	TimerCbBinder;
 
 	bool		_armed = false;
-	bool		_run_at_idle_throttle_when_armed = false;
 	esc_status_s	_esc_status = {};
 	orb_advert_t	_esc_status_pub = nullptr;
 

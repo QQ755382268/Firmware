@@ -1,30 +1,18 @@
 #!/bin/bash
 
-set -e
-
-echo args: $@
-
-sitl_bin=$1
-rcS_dir=$2
-debugger=$3
-program=$4
-model=$5
-src_path=$6
-build_path=$7
+rc_script=$1
+debugger=$2
+program=$3
+model=$4
+build_path=$5
+curr_dir=`pwd`
 
 echo SITL ARGS
-
-echo sitl_bin: $sitl_bin
-echo rcS_dir: $rcS_dir
+echo rc_script: $rc_script
 echo debugger: $debugger
 echo program: $program
 echo model: $model
-echo src_path: $src_path
 echo build_path: $build_path
-
-working_dir=`pwd`
-sitl_bin=$build_path/src/firmware/posix/px4
-rootfs=$build_path/tmp/rootfs
 
 if [ "$chroot" == "1" ]
 then
@@ -41,105 +29,100 @@ then
 	model="iris"
 fi
 
-if [ "$#" -lt 7 ]
+if [ "$#" != 5 ]
 then
-	echo usage: sitl_run.sh rc_script rcS_dir debugger program model src_path build_path
+	echo usage: sitl_run.sh rc_script debugger program model build_path
 	echo ""
 	exit 1
 fi
 
 # kill process names that might stil
 # be running from last time
-pgrep gazebo && pkill gazebo
-pgrep px4 && pkill px4
-jmavsim_pid=`ps aux | grep java | grep Simulator | cut -d" " -f1`
+pkill gazebo
+pkill mainapp
+jmavsim_pid=`jps | grep Simulator | cut -d" " -f1`
 if [ -n "$jmavsim_pid" ]
 then
 	kill $jmavsim_pid
 fi
 
-cp $src_path/Tools/posix_lldbinit $working_dir/.lldbinit
-cp $src_path/Tools/posix.gdbinit $working_dir/.gdbinit
+set -e
+
+cp Tools/posix_lldbinit $build_path/src/firmware/posix/.lldbinit
+cp Tools/posix.gdbinit $build_path/src/firmware/posix/.gdbinit
 
 SIM_PID=0
 
-if [ "$program" == "jmavsim" ] && [ ! -n "$no_sim" ]
+if [ "$program" == "jmavsim" ] && [ "$no_sim" == "" ]
 then
-	$src_path/Tools/jmavsim_run.sh &
+	cd Tools/jMAVSim
+	ant
+	java -Djava.ext.dirs= -cp lib/*:out/production/jmavsim.jar me.drton.jmavsim.Simulator -udp 127.0.0.1:14560 &
 	SIM_PID=`echo $!`
-	cd ../..
-elif [ "$program" == "gazebo" ] && [ ! -n "$no_sim" ]
+elif [ "$program" == "gazebo" ] && [ "$no_sim" == "" ]
 then
 	if [ -x "$(command -v gazebo)" ]
 	then
 		# Set the plugin path so Gazebo finds our model and sim
-		source $src_path/Tools/setup_gazebo.bash ${src_path} ${build_path}
-
-		gzserver --verbose ${src_path}/Tools/sitl_gazebo/worlds/${model}.world &
+		export GAZEBO_PLUGIN_PATH=$curr_dir/Tools/sitl_gazebo/Build:${GAZEBO_PLUGIN_PATH}
+		# Set the model path so Gazebo finds the airframes
+		export GAZEBO_MODEL_PATH=${GAZEBO_MODEL_PATH}:$curr_dir/Tools/sitl_gazebo/models
+		# The next line would disable online model lookup, can be commented in, in case of unstable behaviour.
+		# export GAZEBO_MODEL_DATABASE_URI=""
+		export SITL_GAZEBO_PATH=$curr_dir/Tools/sitl_gazebo
+		mkdir -p Tools/sitl_gazebo/Build
+		cd Tools/sitl_gazebo/Build
+		cmake -Wno-dev ..
+		make -j4
+		gzserver --verbose ../worlds/${model}.world &
 		SIM_PID=`echo $!`
-
-		if [[ -n "$HEADLESS" ]]; then
-			echo "not running gazebo gui"
-		else
-			gzclient --verbose &
-			GUI_PID=`echo $!`
-		fi
+		gzclient --verbose &
+		GUI_PID=`echo $!`
 	else
 		echo "You need to have gazebo simulator installed!"
 		exit 1
 	fi
-elif [ "$program" == "replay" ] && [ ! -n "$no_sim" ]
+elif [ "$program" == "replay" ] && [ "$no_sim" == "" ]
 then
 	echo "Replaying logfile: $logfile"
 	# This is not a simulator, but a log file to replay
-
-	# Check if we need to creat a param file to allow user to change parameters
-	if ! [ -f "$rootfs/replay_params.txt" ]
-		then
-		mkdir -p $rootfs
-		touch $rootfs/replay_params.txt
-	fi
 fi
 
-cd $working_dir
+cd $build_path/src/firmware/posix
+mkdir -p rootfs/fs/microsd
+mkdir -p rootfs/eeprom
+touch rootfs/eeprom/parameters
 
 if [ "$logfile" != "" ]
 then
-	cp $logfile $rootfs/replay.px4log
+	cp $logfile rootfs/replay.px4log
 fi
 
 # Do not exit on failure now from here on because we want the complete cleanup
 set +e
 
-sitl_command="$sudo_enabled $sitl_bin $chroot_enabled $src_path $src_path/${rcS_dir}/${model}"
-
-echo SITL COMMAND: $sitl_command
-
 # Start Java simulator
 if [ "$debugger" == "lldb" ]
 then
-	lldb -- $sitl_command
+	lldb -- mainapp ../../../../${rc_script}_${program}_${model}
 elif [ "$debugger" == "gdb" ]
 then
-	gdb --args $sitl_command
+	gdb --args mainapp ../../../../${rc_script}_${program}_${model}
 elif [ "$debugger" == "ddd" ]
 then
-	ddd --debugger gdb --args $sitl_command
+	ddd --debugger gdb --args mainapp ../../../../${rc_script}_${program}_${model}
 elif [ "$debugger" == "valgrind" ]
 then
-	valgrind $sitl_command
+	valgrind ./mainapp ../../../../${rc_script}_${program}_${model}
 else
-	$sitl_command
+	$sudo_enabled ./mainapp $chroot_enabled ../../../../${rc_script}_${program}_${model}
 fi
 
 if [ "$program" == "jmavsim" ]
 then
-	pkill -9 -P $SIM_PID
 	kill -9 $SIM_PID
 elif [ "$program" == "gazebo" ]
 then
 	kill -9 $SIM_PID
-	if [[ ! -n "$HEADLESS" ]]; then
-		kill -9 $GUI_PID
-	fi
+	kill -9 $GUI_PID
 fi

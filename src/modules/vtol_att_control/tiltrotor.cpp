@@ -208,7 +208,7 @@ void Tiltrotor::update_vtol_state()
 
 			// check if we have reached airspeed to switch to fw mode
 			// also allow switch if we are not armed for the sake of bench testing
-			if (_airspeed->indicated_airspeed_m_s >= _params_tiltrotor.airspeed_trans || can_transition_on_ground()) {
+			if (_airspeed->indicated_airspeed_m_s >= _params_tiltrotor.airspeed_trans || !_armed->armed) {
 				_vtol_schedule.flight_mode = TRANSITION_FRONT_P2;
 				_vtol_schedule.transition_start = hrt_absolute_time();
 			}
@@ -244,11 +244,8 @@ void Tiltrotor::update_vtol_state()
 
 	case TRANSITION_FRONT_P1:
 	case TRANSITION_FRONT_P2:
-		_vtol_mode = TRANSITION_TO_FW;
-		break;
-
 	case TRANSITION_BACK:
-		_vtol_mode = TRANSITION_TO_MC;
+		_vtol_mode = TRANSITION;
 		break;
 	}
 }
@@ -436,12 +433,10 @@ void Tiltrotor::set_rear_motor_state(rear_motor_state state)
 
 	int ret;
 	unsigned servo_count;
-	const char *dev = PWM_OUTPUT0_DEVICE_PATH;
+	char *dev = PWM_OUTPUT0_DEVICE_PATH;
 	int fd = px4_open(dev, 0);
 
-	if (fd < 0) {
-		PX4_WARN("can't open %s", dev);
-	}
+	if (fd < 0) {PX4_WARN("can't open %s", dev);}
 
 	ret = px4_ioctl(fd, PWM_SERVO_GET_COUNT, (unsigned long)&servo_count);
 	struct pwm_output_values pwm_max_values;

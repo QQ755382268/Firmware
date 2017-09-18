@@ -34,6 +34,7 @@
 #define _uORBUtils_hpp_
 
 #include "uORBCommon.hpp"
+#include <string>
 
 namespace uORB
 {

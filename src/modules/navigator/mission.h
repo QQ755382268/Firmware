@@ -91,8 +91,6 @@ public:
 		MISSION_YAWMODE_BACK_TO_HOME = 3,
 		MISSION_YAWMODE_MAX = 4
 	};
-	
-	bool set_current_offboard_mission_index(unsigned index);
 
 private:
 	/**
@@ -111,9 +109,20 @@ private:
 	void advance_mission();
 
 	/**
+	 * Check distance to first waypoint (with lat/lon)
+	 * @return true only if it's not too far from home (< MIS_DIST_1WP)
+	 */
+	bool check_dist_1wp();
+
+	/**
 	 * Set new mission items
 	 */
 	void set_mission_items();
+
+	/**
+	 * Copies position from setpoint if valid, otherwise copies current position
+	 */
+	void copy_positon_if_valid(struct mission_item_s &mission_item, struct position_setpoint_s &setpoint);
 
 	/**
 	 * Returns true if we need to do a takeoff at the current state
@@ -124,21 +133,6 @@ private:
 	 * Returns true if we need to move to waypoint location before starting descent
 	 */
 	bool do_need_move_to_land();
-
-	/**
-	 * Returns true if we need to move to waypoint location after vtol takeoff
-	 */
-	bool do_need_move_to_takeoff();
-
-	/**
-	 * Copies position from setpoint if valid, otherwise copies current position
-	 */
-	void copy_positon_if_valid(struct mission_item_s *mission_item, struct position_setpoint_s *setpoint);
-
-	/**
-	 * Create mission item to align towards next waypoint
-	 */
-	void set_align_mission_item(struct mission_item_s *mission_item, struct mission_item_s *mission_item_next);
 
 	/**
 	 * Calculate takeoff height for mission item considering ground clearance
@@ -159,11 +153,6 @@ private:
 	 * Resets the altitude sp foh logic
 	 */
 	void altitude_sp_foh_reset();
-
-	/**
-	 * Abort landing
-	 */
-	void do_abort_landing();
 
 	float get_absolute_altitude_for_item(struct mission_item_s &mission_item);
 
@@ -210,10 +199,9 @@ private:
 	void set_mission_finished();
 
 	/**
-	 * Check whether a mission is ready to go
+	 * Check wether a mission is ready to go
 	 */
-	void check_mission_valid(bool force);
-
+	bool check_mission_valid();
 
 	/**
 	 * Reset offboard mission
@@ -230,8 +218,6 @@ private:
 	control::BlockParamFloat _param_dist_1wp;
 	control::BlockParamInt _param_altmode;
 	control::BlockParamInt _param_yawmode;
-	control::BlockParamInt _param_force_vtol;
-	control::BlockParamFloat _param_fw_climbout_diff;
 
 	struct mission_s _onboard_mission;
 	struct mission_s _offboard_mission;
@@ -253,7 +239,9 @@ private:
 	MissionFeasibilityChecker _missionFeasibilityChecker; /**< class that checks if a mission is feasible */
 
 	float _min_current_sp_distance_xy; /**< minimum distance which was achieved to the current waypoint  */
-
+	float _mission_item_previous_alt; /**< holds the altitude of the previous mission item,
+					    can be replaced by a full copy of the previous mission item if needed */
+	float _on_arrival_yaw; /**< holds the yaw value that should be applied when the current waypoint is reached */
 	float _distance_current_previous; /**< distance from previous to current sp in pos_sp_triplet,
 					    only use if current and previous are valid */
 
@@ -262,10 +250,7 @@ private:
 		WORK_ITEM_TYPE_TAKEOFF,		/**< takeoff before moving to waypoint */
 		WORK_ITEM_TYPE_MOVE_TO_LAND,	/**< move to land waypoint before descent */
 		WORK_ITEM_TYPE_ALIGN,		/**< align for next waypoint */
-		WORK_ITEM_TYPE_CMD_BEFORE_MOVE,	/**<  */
-		WORK_ITEM_TYPE_TRANSITON_AFTER_TAKEOFF,	/**<  */
-		WORK_ITEM_TYPE_TRANSITON_BEFORE_LAND,	/**<  */
-		WORK_ITEM_TYPE_MOVE_TO_LAND_AFTER_TRANSITION	/**<  */
+		WORK_ITEM_TYPE_CMD_BEFORE_MOVE	/**<  */
 	} _work_item_type;	/**< current type of work to do (sub mission item) */
 
 };

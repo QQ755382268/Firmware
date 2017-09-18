@@ -39,14 +39,12 @@
  * @author Lorenz Meier <lm@inf.ethz.ch>
  */
 
-#include <px4_config.h>
-#include <px4_posix.h>
-#include <px4_tasks.h>
-
 #include <sys/stat.h>
 #include <dirent.h>
 #include <stdio.h>
 #include <stddef.h>
+#include <unistd.h>
+#include <fcntl.h>
 #include <systemlib/err.h>
 #include <systemlib/systemlib.h>
 #include <systemlib/perf_counter.h>
@@ -54,7 +52,7 @@
 
 #include <drivers/drv_hrt.h>
 
-#include "tests_main.h"
+#include "tests.h"
 
 const int fsync_tries = 1;
 const int abort_tries = 10;
@@ -202,7 +200,7 @@ test_mount(int argc, char *argv[])
 
 			uint8_t read_buf[chunk_sizes[c] + alignments] __attribute__((aligned(64)));
 
-			int fd = px4_open(PX4_ROOTFSDIR "/fs/microsd/testfile", O_TRUNC | O_WRONLY | O_CREAT);
+			int fd = open(PX4_ROOTFSDIR "/fs/microsd/testfile", O_TRUNC | O_WRONLY | O_CREAT);
 
 			for (unsigned i = 0; i < iterations; i++) {
 
@@ -238,8 +236,8 @@ test_mount(int argc, char *argv[])
 			fsync(fileno(stderr));
 			usleep(200000);
 
-			px4_close(fd);
-			fd = px4_open(PX4_ROOTFSDIR "/fs/microsd/testfile", O_RDONLY);
+			close(fd);
+			fd = open(PX4_ROOTFSDIR "/fs/microsd/testfile", O_RDONLY);
 
 			/* read back data for validation */
 			for (unsigned i = 0; i < iterations; i++) {
@@ -269,7 +267,7 @@ test_mount(int argc, char *argv[])
 			}
 
 			int ret = unlink(PX4_ROOTFSDIR "/fs/microsd/testfile");
-			px4_close(fd);
+			close(fd);
 
 			if (ret) {
 				PX4_ERR("UNLINKING FILE FAILED");

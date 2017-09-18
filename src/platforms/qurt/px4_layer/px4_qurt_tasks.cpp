@@ -64,7 +64,6 @@
 #include <string>
 
 #include <px4_tasks.h>
-#include <systemlib/err.h>
 
 #define MAX_CMD_LEN 100
 
@@ -197,12 +196,12 @@ px4_task_t px4_task_spawn_cmd(const char *name, int scheduler, int priority, int
 #endif
 	size_t fixed_stacksize = -1;
 	pthread_attr_getstacksize(&attr, &fixed_stacksize);
-	PX4_DEBUG("stack size: %d passed stacksize(%d)", fixed_stacksize, stack_size);
+	PX4_INFO("stack size: %d passed stacksize(%d)", fixed_stacksize, stack_size);
 	fixed_stacksize = 8 * 1024;
 	fixed_stacksize = (fixed_stacksize < (size_t)stack_size) ? (size_t)stack_size : fixed_stacksize;
 
-	PX4_DEBUG("setting the thread[%s] stack size to[%d]", name, fixed_stacksize);
-	pthread_attr_setstacksize(&attr, PX4_STACK_ADJUSTED(fixed_stacksize));
+	PX4_INFO("setting the thread[%s] stack size to[%d]", name, fixed_stacksize);
+	pthread_attr_setstacksize(&attr, fixed_stacksize);
 
 	PX4_DEBUG("stack address after pthread_attr_setstacksize: 0x%X", attr.stackaddr);
 	param.sched_priority = priority;
@@ -326,7 +325,9 @@ void px4_show_tasks()
 
 }
 
-px4_task_t px4_getpid()
+__BEGIN_DECLS
+
+unsigned long px4_getpid()
 {
 	pthread_t pid = pthread_self();
 //
@@ -340,11 +341,13 @@ px4_task_t px4_getpid()
 		}
 	}
 
+	PX4_ERR("px4_getpid() called from unknown thread context!");
 	return ~0;
 }
 
 
-const char *px4_get_taskname()
+const char *getprogname();
+const char *getprogname()
 {
 	pthread_t pid = pthread_self();
 
@@ -382,7 +385,7 @@ int px4_sem_timedwait(px4_sem_t *sem, const struct timespec *ts)
 	return 0;
 }
 
-int px4_prctl(int option, const char *arg2, px4_task_t pid)
+int px4_prctl(int option, const char *arg2, unsigned pid)
 {
 	int rv;
 
@@ -401,3 +404,4 @@ int px4_prctl(int option, const char *arg2, px4_task_t pid)
 
 	return rv;
 }
+__END_DECLS

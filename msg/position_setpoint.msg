@@ -19,7 +19,6 @@ float32 vx			# local velocity setpoint in m/s in NED
 float32 vy			# local velocity setpoint in m/s in NED
 float32 vz			# local velocity setpoint in m/s in NED
 bool velocity_valid		# true if local velocity setpoint valid
-bool alt_valid		# do not set for 3D position control. Set to true if you want z-position control while doing vx,vy velocity control.
 float64 lat			# latitude, in deg
 float64 lon			# longitude, in deg
 float32 alt			# altitude AMSL, in m
@@ -38,4 +37,3 @@ bool acceleration_valid		# true if acceleration setpoint is valid/should be used
 bool acceleration_is_force	# interprete acceleration as force
 float32 acceptance_radius   # navigation acceptance_radius if we're doing waypoint navigation
 float32 cruising_speed		# the generally desired cruising speed (not a hard constraint)
-float32 cruising_throttle	# the generally desired cruising throttle (not a hard constraint)

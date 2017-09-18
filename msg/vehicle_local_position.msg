@@ -1,5 +1,6 @@
 # Fused local position in NED.
 
+uint64 timestamp			# Time of this estimate since system start, (microseconds)
 bool xy_valid				# true if x and y are valid
 bool z_valid				# true if z is valid
 bool v_xy_valid				# true if vy and vy are valid
@@ -33,5 +34,3 @@ uint64 surface_bottom_timestamp		# Time when new bottom surface found since syst
 bool dist_bottom_valid			# true if distance to bottom surface is valid
 float32 eph				# Standard deviation of horizontal position error, (metres)
 float32 epv				# Standard deviation of vertical position error, (metres)
-
-# TOPICS vehicle_local_position vehicle_local_position_groundtruth

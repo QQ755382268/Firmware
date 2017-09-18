@@ -51,7 +51,6 @@
 #include <systemlib/err.h>
 #include <uORB/uORB.h>
 #include <uORB/topics/vehicle_status.h>
-#include <uORB/topics/battery_status.h>
 #include <poll.h>
 #include <drivers/drv_gpio.h>
 #include <modules/px4iofirmware/protocol.h>
@@ -61,10 +60,8 @@ struct gpio_led_s {
 	int gpio_fd;
 	bool use_io;
 	int pin;
-	struct vehicle_status_s vehicle_status;
-	struct battery_status_s battery_status;
+	struct vehicle_status_s status;
 	int vehicle_status_sub;
-	int battery_status_sub;
 	bool led_state;
 	int counter;
 };
@@ -92,8 +89,7 @@ int gpio_led_main(int argc, char *argv[])
 		     "\t\tr2\tPX4IO RELAY2"
 		    );
 #endif
-#if defined(CONFIG_ARCH_BOARD_PX4FMU_V2) || defined(CONFIG_ARCH_BOARD_PX4FMU_V4) \
-	|| defined(CONFIG_ARCH_BOARD_MINDPX_V2)
+#if defined(CONFIG_ARCH_BOARD_PX4FMU_V2) || defined(CONFIG_ARCH_BOARD_PX4FMU_V4)
 		errx(1, "usage: gpio_led {start|stop} [-p <n>]\n"
 		     "\t-p <n>\tUse specified AUX OUT pin number (default: 1)"
 		    );
@@ -115,8 +111,7 @@ int gpio_led_main(int argc, char *argv[])
 #ifdef CONFIG_ARCH_BOARD_PX4FMU_V1
 			char *pin_name = "PX4FMU GPIO_EXT1";
 #endif
-#if defined(CONFIG_ARCH_BOARD_PX4FMU_V2) || defined(CONFIG_ARCH_BOARD_PX4FMU_V4) \
-	|| defined(CONFIG_ARCH_BOARD_MINDPX_V2)
+#if defined(CONFIG_ARCH_BOARD_PX4FMU_V2) || defined(CONFIG_ARCH_BOARD_PX4FMU_V4)
 			char pin_name[] = "AUX OUT 1";
 #endif
 
@@ -159,8 +154,7 @@ int gpio_led_main(int argc, char *argv[])
 					}
 
 #endif
-#if defined(CONFIG_ARCH_BOARD_PX4FMU_V2) || defined(CONFIG_ARCH_BOARD_PX4FMU_V4) \
-	|| defined(CONFIG_ARCH_BOARD_MINDPX_V2)
+#if defined(CONFIG_ARCH_BOARD_PX4FMU_V2) || defined(CONFIG_ARCH_BOARD_PX4FMU_V4)
 					unsigned int n = strtoul(argv[3], NULL, 10);
 
 					if (n >= 1 && n <= 6) {
@@ -241,16 +235,10 @@ void gpio_led_start(FAR void *arg)
 	ioctl(priv->gpio_fd, GPIO_SET_OUTPUT, priv->pin);
 
 	/* initialize vehicle status structure */
-	memset(&priv->vehicle_status, 0, sizeof(priv->vehicle_status));
-
-	/* initialize battery status structure */
-	memset(&priv->battery_status, 0, sizeof(priv->battery_status));
+	memset(&priv->status, 0, sizeof(priv->status));
 
 	/* subscribe to vehicle status topic */
 	priv->vehicle_status_sub = orb_subscribe(ORB_ID(vehicle_status));
-
-	/* subscribe to battery status topic */
-	priv->battery_status_sub = orb_subscribe(ORB_ID(battery_status));
 
 	/* add worker to queue */
 	int ret = work_queue(LPWORK, &priv->work, gpio_led_cycle, priv, 0);
@@ -267,39 +255,32 @@ void gpio_led_cycle(FAR void *arg)
 {
 	FAR struct gpio_led_s *priv = (FAR struct gpio_led_s *)arg;
 
-	/* check for vehicle status updates*/
+	/* check for status updates*/
 	bool updated;
 	orb_check(priv->vehicle_status_sub, &updated);
 
 	if (updated) {
-		orb_copy(ORB_ID(vehicle_status), priv->vehicle_status_sub, &priv->vehicle_status);
+		orb_copy(ORB_ID(vehicle_status), priv->vehicle_status_sub, &priv->status);
 	}
 
-	orb_check(priv->battery_status_sub, &updated);
-
-	if (updated) {
-		orb_copy(ORB_ID(battery_status), priv->battery_status_sub, &priv->battery_status);
-	}
-
-	/* select pattern for current vehiclestatus */
+	/* select pattern for current status */
 	int pattern = 0;
 
-	if (priv->vehicle_status.arming_state == ARMING_STATE_ARMED_ERROR) {
+	if (priv->status.arming_state == ARMING_STATE_ARMED_ERROR) {
 		pattern = 0x2A;	// *_*_*_ fast blink (armed, error)
 
-	} else if (priv->vehicle_status.arming_state == ARMING_STATE_ARMED) {
-		if (priv->battery_status.warning == BATTERY_WARNING_NONE
-		    && !priv->vehicle_status.failsafe) {
+	} else if (priv->status.arming_state == ARMING_STATE_ARMED) {
+		if (priv->status.battery_warning == VEHICLE_BATTERY_WARNING_NONE && !priv->status.failsafe) {
 			pattern = 0x3f;	// ****** solid (armed)
 
 		} else {
 			pattern = 0x3e;	// *****_ slow blink (armed, battery low or failsafe)
 		}
 
-	} else if (priv->vehicle_status.arming_state == ARMING_STATE_STANDBY) {
+	} else if (priv->status.arming_state == ARMING_STATE_STANDBY) {
 		pattern = 0x38;	// ***___ slow blink (disarmed, ready)
 
-	} else if (priv->vehicle_status.arming_state == ARMING_STATE_STANDBY_ERROR) {
+	} else if (priv->status.arming_state == ARMING_STATE_STANDBY_ERROR) {
 		pattern = 0x28;	// *_*___ slow double blink (disarmed, error)
 
 	}

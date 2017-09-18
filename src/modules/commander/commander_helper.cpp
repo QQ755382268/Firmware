@@ -67,44 +67,33 @@
 
 using namespace DriverFramework;
 
-#define VEHICLE_TYPE_QUADROTOR 2
-#define VEHICLE_TYPE_COAXIAL 3
-#define VEHICLE_TYPE_HELICOPTER 4
-#define VEHICLE_TYPE_HEXAROTOR 13
-#define VEHICLE_TYPE_OCTOROTOR 14
-#define VEHICLE_TYPE_TRICOPTER 15
-#define VEHICLE_TYPE_VTOL_DUOROTOR 19
-#define VEHICLE_TYPE_VTOL_QUADROTOR 20
-#define VEHICLE_TYPE_VTOL_TILTROTOR 21
-#define VEHICLE_TYPE_VTOL_RESERVED2 22
-#define VEHICLE_TYPE_VTOL_RESERVED3 23
-#define VEHICLE_TYPE_VTOL_RESERVED4 24
-#define VEHICLE_TYPE_VTOL_RESERVED5 25
+/* oddly, ERROR is not defined for c++ */
+#ifdef ERROR
+# undef ERROR
+#endif
+static const int ERROR = -1;
 
 #define BLINK_MSG_TIME	700000	// 3 fast blinks
 
 bool is_multirotor(const struct vehicle_status_s *current_status)
 {
-	return ((current_status->system_type == VEHICLE_TYPE_QUADROTOR) ||
-		(current_status->system_type == VEHICLE_TYPE_HEXAROTOR) ||
-		(current_status->system_type == VEHICLE_TYPE_OCTOROTOR) ||
-		(current_status->system_type == VEHICLE_TYPE_TRICOPTER));
+	return ((current_status->system_type == vehicle_status_s::VEHICLE_TYPE_QUADROTOR) ||
+		(current_status->system_type == vehicle_status_s::VEHICLE_TYPE_HEXAROTOR) ||
+		(current_status->system_type == vehicle_status_s::VEHICLE_TYPE_OCTOROTOR) ||
+		(current_status->system_type == vehicle_status_s::VEHICLE_TYPE_TRICOPTER));
 }
 
 bool is_rotary_wing(const struct vehicle_status_s *current_status)
 {
-	return is_multirotor(current_status) || (current_status->system_type == VEHICLE_TYPE_HELICOPTER)
-		   || (current_status->system_type == VEHICLE_TYPE_COAXIAL);
+	return is_multirotor(current_status) || (current_status->system_type == vehicle_status_s::VEHICLE_TYPE_HELICOPTER)
+	       || (current_status->system_type == vehicle_status_s::VEHICLE_TYPE_COAXIAL);
 }
 
 bool is_vtol(const struct vehicle_status_s * current_status) {
-	return (current_status->system_type == VEHICLE_TYPE_VTOL_DUOROTOR ||
-		current_status->system_type == VEHICLE_TYPE_VTOL_QUADROTOR ||
-		current_status->system_type == VEHICLE_TYPE_VTOL_TILTROTOR ||
-		current_status->system_type == VEHICLE_TYPE_VTOL_RESERVED2 ||
-		current_status->system_type == VEHICLE_TYPE_VTOL_RESERVED3 ||
-		current_status->system_type == VEHICLE_TYPE_VTOL_RESERVED4 ||
-		current_status->system_type == VEHICLE_TYPE_VTOL_RESERVED5);
+	return (current_status->system_type == vehicle_status_s::VEHICLE_TYPE_VTOL_DUOROTOR ||
+		current_status->system_type == vehicle_status_s::VEHICLE_TYPE_VTOL_QUADROTOR ||
+		current_status->system_type == vehicle_status_s::VEHICLE_TYPE_VTOL_HEXAROTOR ||
+		current_status->system_type == vehicle_status_s::VEHICLE_TYPE_VTOL_OCTOROTOR);
 }
 
 static hrt_abstime blink_msg_end = 0;	// end time for currently blinking LED message, 0 if no blink message
@@ -115,6 +104,30 @@ static unsigned int tune_durations[TONE_NUMBER_OF_TUNES];
 static DevHandle h_leds;
 static DevHandle h_rgbleds;
 static DevHandle h_buzzer;
+
+static param_t bat_v_empty_h;
+static param_t bat_v_full_h;
+static param_t bat_n_cells_h;
+static param_t bat_capacity_h;
+static param_t bat_v_load_drop_h;
+static float bat_v_empty = 3.4f;
+static float bat_v_full = 4.2f;
+static float bat_v_load_drop = 0.06f;
+static int bat_n_cells = 3;
+static float bat_capacity = -1.0f;
+static unsigned int counter = 0;
+static float throttle_lowpassed = 0.0f;
+
+int battery_init()
+{
+	bat_v_empty_h = param_find("BAT_V_EMPTY");
+	bat_v_full_h = param_find("BAT_V_CHARGED");
+	bat_n_cells_h = param_find("BAT_N_CELLS");
+	bat_capacity_h = param_find("BAT_CAPACITY");
+	bat_v_load_drop_h = param_find("BAT_V_LOAD_DROP");
+
+	return PX4_OK;
+}
 
 int buzzer_init()
 {
@@ -130,7 +143,7 @@ int buzzer_init()
 
 	if (!h_buzzer.isValid()) {
 		PX4_WARN("Buzzer: px4_open fail\n");
-		return PX4_ERROR;
+		return ERROR;
 	}
 
 	return PX4_OK;
@@ -261,13 +274,12 @@ int led_init()
 {
 	blink_msg_end = 0;
 
-#ifndef CONFIG_ARCH_BOARD_RPI
 	/* first open normal LEDs */
 	DevMgr::getHandle(LED0_DEVICE_PATH, h_leds);
 
 	if (!h_leds.isValid()) {
 		PX4_WARN("LED: getHandle fail\n");
-		return PX4_ERROR;
+		return ERROR;
 	}
 
 	/* the blue LED is only available on FMUv1 & AeroCore but not FMUv2 */
@@ -279,12 +291,11 @@ int led_init()
 	/* we consider the amber led mandatory */
 	if (h_leds.ioctl(LED_ON, LED_AMBER)) {
 		PX4_WARN("Amber LED: ioctl fail\n");
-		return PX4_ERROR;
+		return ERROR;
 	}
 
 	/* switch amber off */
 	led_off(LED_AMBER);
-#endif
 
 	/* then try RGB LEDs, this can fail on FMUv1*/
 	DevHandle h;
@@ -299,9 +310,7 @@ int led_init()
 
 void led_deinit()
 {
-#ifndef CONFIG_ARCH_BOARD_RPI
 	DevMgr::releaseHandle(h_leds);
-#endif
 	DevMgr::releaseHandle(h_rgbleds);
 }
 
@@ -336,4 +345,52 @@ void rgbled_set_pattern(rgbled_pattern_t *pattern)
 {
 
 	h_rgbleds.ioctl(RGBLED_SET_PATTERN, (unsigned long)pattern);
+}
+
+unsigned battery_get_n_cells() {
+	return bat_n_cells;
+}
+
+float battery_remaining_estimate_voltage(float voltage, float discharged, float throttle_normalized)
+{
+	float ret = 0;
+
+	if (counter % 100 == 0) {
+		param_get(bat_v_empty_h, &bat_v_empty);
+		param_get(bat_v_full_h, &bat_v_full);
+		param_get(bat_v_load_drop_h, &bat_v_load_drop);
+		param_get(bat_n_cells_h, &bat_n_cells);
+		param_get(bat_capacity_h, &bat_capacity);
+	}
+
+	counter++;
+
+	// XXX this time constant needs to become tunable
+	// but really, the right fix are smart batteries.
+	float val = throttle_lowpassed * 0.97f + throttle_normalized * 0.03f;
+	if (PX4_ISFINITE(val)) {
+		throttle_lowpassed = val;
+	}
+
+	/* remaining charge estimate based on voltage and internal resistance (drop under load) */
+	float bat_v_empty_dynamic = bat_v_empty - (bat_v_load_drop * throttle_lowpassed);
+	/* the range from full to empty is the same for batteries under load and without load,
+	 * since the voltage drop applies to both the full and empty state
+	 */
+	float voltage_range = (bat_v_full - bat_v_empty);
+	float remaining_voltage = (voltage - (bat_n_cells * bat_v_empty_dynamic)) / (bat_n_cells * voltage_range);
+
+	if (bat_capacity > 0.0f) {
+		/* if battery capacity is known, use discharged current for estimate, but don't show more than voltage estimate */
+		ret = fminf(remaining_voltage, 1.0f - discharged / bat_capacity);
+
+	} else {
+		/* else use voltage */
+		ret = remaining_voltage;
+	}
+
+	/* limit to sane values */
+	ret = (ret < 0.0f) ? 0.0f : ret;
+	ret = (ret > 1.0f) ? 1.0f : ret;
+	return ret;
 }

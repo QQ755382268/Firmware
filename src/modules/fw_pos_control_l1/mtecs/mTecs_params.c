@@ -45,6 +45,8 @@
 /**
  * mTECS enabled
  *
+ * Set to 1 to enable mTECS
+ *
  * @boolean
  * @group mTECS
  */

@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2012-2016 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2012, 2013, 2015 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -89,18 +89,14 @@ top_main(int argc, char *argv[])
 
 			if (ret > 0) {
 
-				ret = read(0, &c, 1);
-
-				if (ret) {
-					return 1;
-				}
+				read(0, &c, 1);
 
 				switch (c) {
 				case 0x03: // ctrl-c
 				case 0x1b: // esc
 				case 'c':
 				case 'q':
-					return 0;
+					return OK;
 					/* not reached */
 				}
 			}
@@ -111,5 +107,5 @@ top_main(int argc, char *argv[])
 		curr_time = hrt_absolute_time();
 	}
 
-	return 0;
+	return OK;
 }

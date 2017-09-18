@@ -51,10 +51,7 @@ public:
 	};
 
 	StateTable(Tran const *table, unsigned nStates, unsigned nSignals)
-		: myState(0), myTable(table), myNsignals(nSignals) {}
-
-	StateTable(const StateTable &) = delete;
-	StateTable &operator=(const StateTable &) = delete;
+		: myTable(table), myNsignals(nSignals) {}
 
 #define NO_ACTION &StateTable::doNothing
 #define ACTION(_target) StateTable::Action(_target)

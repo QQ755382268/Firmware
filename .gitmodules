@@ -1,15 +1,12 @@
 [submodule "mavlink/include/mavlink/v1.0"]
 	path = mavlink/include/mavlink/v1.0
-	url = https://github.com/mavlink/c_library_v1.git
-[submodule "mavlink/include/mavlink/v2.0"]
-	path = mavlink/include/mavlink/v2.0
-	url = https://github.com/mavlink/c_library_v2.git
+	url = git://github.com/mavlink/c_library.git
 [submodule "NuttX"]
 	path = NuttX
-	url = https://github.com/PX4/NuttX.git
+	url = git://github.com/PX4/NuttX.git
 [submodule "src/modules/uavcan/libuavcan"]
 	path = src/modules/uavcan/libuavcan
-	url = https://github.com/UAVCAN/libuavcan.git
+	url = git://github.com/UAVCAN/libuavcan.git
 [submodule "Tools/genmsg"]
 	path = Tools/genmsg
 	url = https://github.com/ros/genmsg.git
@@ -38,6 +35,3 @@
 [submodule "cmake/cmake_hexagon"]
 	path = cmake/cmake_hexagon
 	url = https://github.com/ATLFlight/cmake_hexagon
-[submodule "src/drivers/gps/devices"]
-	path = src/drivers/gps/devices
-	url = https://github.com/PX4/GpsDrivers.git

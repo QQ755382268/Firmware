@@ -48,7 +48,6 @@
 #include <uavcan/helpers/heap_based_pool_allocator.hpp>
 #include <uavcan/protocol/global_time_sync_master.hpp>
 #include <uavcan/protocol/global_time_sync_slave.hpp>
-#include <uavcan/protocol/node_status_monitor.hpp>
 #include <uavcan/protocol/param/GetSet.hpp>
 #include <uavcan/protocol/param/ExecuteOpcode.hpp>
 #include <uavcan/protocol/RestartNode.hpp>
@@ -73,6 +72,10 @@
 
 // we add two to allow for actuator_direct and busevent
 #define UAVCAN_NUM_POLL_FDS (NUM_ACTUATOR_CONTROL_GROUPS_UAVCAN+2)
+
+// IOCTL control codes
+static constexpr unsigned UAVCANIOCBASE = 0x7800;
+static constexpr unsigned UAVCANIOC_HARDPOINT_SET = _PX4_IOC(UAVCANIOCBASE, 0x10);
 
 /**
  * A UAVCAN node.
@@ -100,7 +103,7 @@ class UavcanNode : public device::CDev
 	 */
 
 	static constexpr unsigned RxQueueLenPerIface	= FramePerMSecond * PollTimeoutMs; // At
-	static constexpr unsigned StackSize		= 2400;
+	static constexpr unsigned StackSize		= 1800;
 
 public:
 	typedef uavcan_stm32::CanInitHelper<RxQueueLenPerIface> CanInitHelper;
@@ -140,6 +143,8 @@ public:
 	int			 set_param(int remote_node_id, const char *name, char *value);
 	int			 get_param(int remote_node_id, const char *name);
 	int			 reset_node(int remote_node_id);
+
+
 
 private:
 	void		fill_node_info();
@@ -186,7 +191,6 @@ private:
 	UavcanHardpointController	_hardpoint_controller;
 	uavcan::GlobalTimeSyncMaster	_time_sync_master;
 	uavcan::GlobalTimeSyncSlave	_time_sync_slave;
-	uavcan::NodeStatusMonitor	_node_status_monitor;
 
 	List<IUavcanSensorBridge *>	_sensor_bridges;		///< List of active sensor bridges
 

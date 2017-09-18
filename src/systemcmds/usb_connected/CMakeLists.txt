@@ -34,9 +34,10 @@ px4_add_module(
 	MODULE systemcmds__usb_connected
 	MAIN usb_connected
 	COMPILE_FLAGS
+		-Os
 	SRCS
 		usb_connected.c
 	DEPENDS
 		platforms__common
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :
+# vim: set noet ft=cmake fenc=utf-8 ff=unix : 

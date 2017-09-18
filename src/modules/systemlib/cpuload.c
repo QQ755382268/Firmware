@@ -1,6 +1,8 @@
 /****************************************************************************
  *
- *   Copyright (c) 2012-2016 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2012, 2013 PX4 Development Team. All rights reserved.
+ *   Author: Lorenz Meier <lm@inf.ethz.ch>
+ * 	     Petri Tanskanen <petri.tanskanen@inf.ethz.ch>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -36,10 +38,11 @@
  *
  * Measurement of CPU load of each individual task.
  *
- * @author Lorenz Meier <lorenz@px4.io>
+ * @author Lorenz Meier <lm@inf.ethz.ch>
  * @author Petri Tanskanen <petri.tanskanen@inf.ethz.ch>
  */
 #include <px4_config.h>
+//#include <nuttx/sched.h>
 
 #include <sys/types.h>
 #include <stdint.h>
@@ -142,14 +145,12 @@ void sched_note_switch(FAR struct tcb_s *pFromTcb, FAR struct tcb_s *pToTcb)
 	uint8_t both_found = 0;
 
 	for (int i = 0; i < CONFIG_MAX_TASKS; i++) {
-		/* Check if task is initialized correctly */
-		if (system_load.tasks[i].tcb == NULL) {
-			continue;
-		}
-
 		/* Task ending its current scheduling run */
 		if (system_load.tasks[i].tcb->pid == pFromTcb->pid) {
-			system_load.tasks[i].total_runtime += new_time - system_load.tasks[i].curr_start_time;
+			//if (system_load.tasks[i].curr_start_time != 0)
+			{
+				system_load.tasks[i].total_runtime += new_time - system_load.tasks[i].curr_start_time;
+			}
 			both_found++;
 
 		} else if (system_load.tasks[i].tcb->pid == pToTcb->pid) {

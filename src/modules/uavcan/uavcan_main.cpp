@@ -45,7 +45,6 @@
 
 #include <cstdlib>
 #include <cstring>
-#include <array>
 #include <fcntl.h>
 #include <systemlib/err.h>
 #include <systemlib/systemlib.h>
@@ -85,7 +84,6 @@ UavcanNode::UavcanNode(uavcan::ICanDriver &can_driver, uavcan::ISystemClock &sys
 	_hardpoint_controller(_node),
 	_time_sync_master(_node),
 	_time_sync_slave(_node),
-	_node_status_monitor(_node),
 	_master_timer(_node),
 	_setget_response(0)
 
@@ -539,12 +537,12 @@ int UavcanNode::start(uavcan::NodeID node_id, uint32_t bitrate)
 	 * fail during initialization.
 	 */
 #if defined(GPIO_CAN1_RX)
-	px4_arch_configgpio(GPIO_CAN1_RX);
-	px4_arch_configgpio(GPIO_CAN1_TX);
+	stm32_configgpio(GPIO_CAN1_RX);
+	stm32_configgpio(GPIO_CAN1_TX);
 #endif
 #if defined(GPIO_CAN2_RX)
-	px4_arch_configgpio(GPIO_CAN2_RX | GPIO_PULLUP);
-	px4_arch_configgpio(GPIO_CAN2_TX);
+	stm32_configgpio(GPIO_CAN2_RX | GPIO_PULLUP);
+	stm32_configgpio(GPIO_CAN2_TX);
 #endif
 #if !defined(GPIO_CAN1_RX) &&  !defined(GPIO_CAN2_RX)
 # error  "Need to define GPIO_CAN1_RX and/or GPIO_CAN2_RX"
@@ -552,33 +550,25 @@ int UavcanNode::start(uavcan::NodeID node_id, uint32_t bitrate)
 
 	/*
 	 * CAN driver init
-	 * Note that we instantiate and initialize CanInitHelper only once, because the STM32's bxCAN driver
-	 * shipped with libuavcan does not support deinitialization.
 	 */
-	static CanInitHelper* can = nullptr;
+	static CanInitHelper can;
+	static bool can_initialized = false;
 
-	if (can == nullptr) {
-		warnx("CAN driver init...");
-
-		can = new CanInitHelper();
-
-		if (can == nullptr) {                    // We don't have exceptions so bad_alloc cannot be thrown
-			warnx("Out of memory");
-			return -1;
-		}
-
-		const int can_init_res = can->init(bitrate);
+	if (!can_initialized) {
+		const int can_init_res = can.init(bitrate);
 
 		if (can_init_res < 0) {
 			warnx("CAN driver init failed %i", can_init_res);
 			return can_init_res;
 		}
+
+		can_initialized = true;
 	}
 
 	/*
 	 * Node init
 	 */
-	_instance = new UavcanNode(can->driver, uavcan_stm32::SystemClock::instance());
+	_instance = new UavcanNode(can.driver, uavcan_stm32::SystemClock::instance());
 
 	if (_instance == nullptr) {
 		warnx("Out of memory");
@@ -660,12 +650,6 @@ int UavcanNode::init(uavcan::NodeID node_id)
 
 	if (ret < 0) {
 		return ret;
-	}
-
-	{
-		std::int32_t idle_throttle_when_armed = 0;
-		(void) param_get(param_find("UAVCAN_ESC_IDLT"), &idle_throttle_when_armed);
-		_esc_controller.enable_idle_throttle_when_armed(idle_throttle_when_armed > 0);
 	}
 
 	ret = _hardpoint_controller.init();
@@ -808,7 +792,7 @@ int UavcanNode::run()
 	_master_timer.setCallback(TimerCallback(this, &UavcanNode::handle_time_sync));
 	_master_timer.startPeriodic(uavcan::MonotonicDuration::fromMSec(1000));
 
-	_node_status_monitor.start();
+
 
 	const int busevent_fd = ::open(uavcan_stm32::BusEvent::DevName, 0);
 
@@ -1131,29 +1115,11 @@ UavcanNode::ioctl(file *filp, int cmd, unsigned long arg)
 		break;
 
 
-	case UAVCAN_IOCS_HARDPOINT_SET: {
-			const auto &hp_cmd = *reinterpret_cast<uavcan::equipment::hardpoint::Command *>(arg);
-			_hardpoint_controller.set_command(hp_cmd.hardpoint_id, hp_cmd.command);
+	case UAVCANIOC_HARDPOINT_SET: {
+			const auto &cmd = *reinterpret_cast<uavcan::equipment::hardpoint::Command *>(arg);
+			_hardpoint_controller.set_command(cmd.hardpoint_id, cmd.command);
 		}
 		break;
-
-	case UAVCAN_IOCG_NODEID_INPROGRESS: {
-		UavcanServers   *_servers = UavcanServers::instance();
-
-		if (_servers == nullptr) {
-			// status unavailable
-			ret = -EINVAL;
-			break;
-		} else if (_servers->guessIfAllDynamicNodesAreAllocated()) {
-			// node discovery complete
-			ret = -ETIME;
-			break;
-		} else {
-			// node discovery in progress
-			ret = OK;
-			break;
-		}
-	}
 
 	default:
 		ret = -ENOTTY;
@@ -1229,13 +1195,10 @@ UavcanNode::print_info()
 		printf("Addr\tV\tA\tTemp\tSetpt\tRPM\tErr\n");
 
 		for (uint8_t i = 0; i < _outputs.noutputs; i++) {
-			const float temp_celsius = (esc.esc[i].esc_temperature > 0) ?
-				(esc.esc[i].esc_temperature - 273.15F) : 0.0F;
-
 			printf("%d\t",    esc.esc[i].esc_address);
 			printf("%3.2f\t", (double)esc.esc[i].esc_voltage);
 			printf("%3.2f\t", (double)esc.esc[i].esc_current);
-			printf("%3.2f\t", (double)temp_celsius);
+			printf("%3.2f\t", (double)esc.esc[i].esc_temperature);
 			printf("%3.2f\t", (double)esc.esc[i].esc_setpoint);
 			printf("%d\t",    esc.esc[i].esc_rpm);
 			printf("%d",      esc.esc[i].esc_errorcount);
@@ -1254,18 +1217,6 @@ UavcanNode::print_info()
 		printf("\n");
 		br = br->getSibling();
 	}
-
-	// Printing all nodes that are online
-	std::printf("Online nodes (Node ID, Health, Mode):\n");
-	_node_status_monitor.forEachNode([](uavcan::NodeID nid, uavcan::NodeStatusMonitor::NodeStatus ns) {
-		static constexpr std::array<const char*, 4> HEALTH = {
-			"OK", "WARN", "ERR", "CRIT"
-		};
-		static constexpr std::array<const char*, 8> MODES = {
-			"OPERAT", "INIT", "MAINT", "SW_UPD", "?", "?", "?", "OFFLN"
-		};
-		std::printf("\t% 3d %-10s %-10s\n", int(nid.get()), HEALTH.at(ns.health), MODES.at(ns.mode));
-	});
 
 	(void)pthread_mutex_unlock(&_node_mutex);
 }

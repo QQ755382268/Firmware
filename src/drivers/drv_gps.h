@@ -37,7 +37,8 @@
  * GPS driver interface.
  */
 
-#pragma once
+#ifndef _DRV_GPS_H
+#define _DRV_GPS_H
 
 #include <stdint.h>
 #include <sys/ioctl.h>
@@ -51,9 +52,25 @@
 #define GPS_DEFAULT_UART_PORT "/dev/ttyS3"
 #endif
 
+#define GPS0_DEVICE_PATH	"/dev/gps0"
+
 typedef enum {
 	GPS_DRIVER_MODE_NONE = 0,
 	GPS_DRIVER_MODE_UBX,
 	GPS_DRIVER_MODE_MTK,
 	GPS_DRIVER_MODE_ASHTECH
 } gps_driver_mode_t;
+
+
+/*
+ * ObjDev tag for GPS data.
+ */
+ORB_DECLARE(gps);
+
+/*
+ * ioctl() definitions
+ */
+#define _GPSIOCBASE			(0x2800)            //TODO: arbitrary choice...
+#define _GPSIOC(_n)		(_IOC(_GPSIOCBASE, _n))
+
+#endif /* _DRV_GPS_H */

@@ -30,17 +30,25 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 ############################################################################
+set(SENSORS_SRCS sensors.cpp)
+if (${OS} STREQUAL "qurt")
+	list(APPEND SENSORS_SRCS
+		sensors_init_qurt.cpp)
+	else()
+	list(APPEND SENSORS_SRCS
+		sensors_init.cpp)
+endif()
 
 px4_add_module(
 	MODULE modules__sensors
 	MAIN sensors
 	PRIORITY "SCHED_PRIORITY_MAX-5"
-	STACK_MAIN 1300
+	STACK 1200
 	COMPILE_FLAGS
+		-Wno-type-limits
+		-O3
 	SRCS
-		sensors.cpp
-		sensors_init.cpp
-
+		${SENSORS_SRCS}
 	DEPENDS
 		platforms__common
 	)

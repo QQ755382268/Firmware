@@ -86,14 +86,7 @@ public:
 
 // accessors
 	const struct orb_metadata *getMeta() { return _meta; }
-	int getHandle() const { return _handle; }
-
-	unsigned getInterval() const
-	{
-		unsigned int interval;
-		orb_get_interval(getHandle(), &interval);
-		return interval;
-	}
+	int getHandle() { return _handle; }
 protected:
 // accessors
 	void setHandle(int handle) { _handle = handle; }
@@ -137,7 +130,8 @@ public:
 			 unsigned interval = 0,
 			 int instance = 0,
 			 List<SubscriptionNode *> *list = nullptr) :
-		SubscriptionBase(meta, interval, instance)
+		SubscriptionBase(meta, interval, instance),
+		_interval(interval)
 	{
 		if (list != nullptr) { list->add(this); }
 	}
@@ -147,6 +141,11 @@ public:
 	 * updates, a child class must implement it.
 	 */
 	virtual void update() = 0;
+// accessors
+	unsigned getInterval() { return _interval; }
+protected:
+// attributes
+	unsigned _interval;
 
 };
 
@@ -173,8 +172,6 @@ public:
 		     int instance = 0,
 		     List<SubscriptionNode *> *list = nullptr);
 
-	Subscription(const Subscription &);
-
 	/**
 	 * Deconstructor
 	 */
@@ -186,10 +183,6 @@ public:
 	 */
 	void update();
 
-	/**
-	 * Create an update function that uses the embedded struct.
-	 */
-	bool check_updated();
 	/*
 	 * This function gets the T struct data
 	 * */

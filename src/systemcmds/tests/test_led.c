@@ -51,7 +51,7 @@
 
 #include <drivers/drv_led.h>
 
-#include "tests_main.h"
+#include "tests.h"
 
 /****************************************************************************
  * Pre-processor Definitions

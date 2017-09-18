@@ -36,20 +36,16 @@
  * Land detection algorithm for VTOL
  *
  * @author Roman Bapst <bapstroma@gmail.com>
- * @author Julian Oes <julian@oes.ch>
  */
 
-#include <drivers/drv_hrt.h>
-
 #include "VtolLandDetector.h"
-
-namespace land_detector
-{
+#include <drivers/drv_hrt.h>
 
 VtolLandDetector::VtolLandDetector() : MulticopterLandDetector(),
 	_paramHandle(),
 	_params(),
 	_airspeedSub(-1),
+	_parameterSub(-1),
 	_airspeed{},
 	_was_in_air(false),
 	_airspeed_filtered(0)
@@ -57,24 +53,29 @@ VtolLandDetector::VtolLandDetector() : MulticopterLandDetector(),
 	_paramHandle.maxAirSpeed = param_find("LNDFW_AIRSPD_MAX");
 }
 
-void VtolLandDetector::_initialize_topics()
+void VtolLandDetector::initialize()
 {
-	MulticopterLandDetector::_initialize_topics();
-
+	MulticopterLandDetector::initialize();
 	_airspeedSub = orb_subscribe(ORB_ID(airspeed));
+
+	// download parameters
+	updateParameterCache(true);
 }
 
-void VtolLandDetector::_update_topics()
+void VtolLandDetector::updateSubscriptions()
 {
-	MulticopterLandDetector::_update_topics();
+	MulticopterLandDetector::updateSubscriptions();
 
-	_orb_update(ORB_ID(airspeed), _airspeedSub, &_airspeed);
+	orb_update(ORB_ID(airspeed), _airspeedSub, &_airspeed);
 }
 
-bool VtolLandDetector::_get_landed_state()
+bool VtolLandDetector::update()
 {
+	updateSubscriptions();
+	updateParameterCache(false);
+
 	// this is returned from the mutlicopter land detector
-	bool landed = MulticopterLandDetector::_get_landed_state();
+	bool landed = get_landed_state();
 
 	// for vtol we additionally consider airspeed
 	if (hrt_elapsed_time(&_airspeed.timestamp) < 500 * 1000) {
@@ -96,16 +97,20 @@ bool VtolLandDetector::_get_landed_state()
 	return landed;
 }
 
-bool VtolLandDetector::_get_freefall_state()
+void VtolLandDetector::updateParameterCache(const bool force)
 {
-	return MulticopterLandDetector::_get_freefall_state();
-}
+	MulticopterLandDetector::updateParameterCache(force);
 
-void VtolLandDetector::_update_params()
-{
-	MulticopterLandDetector::_update_params();
+	bool updated;
+	parameter_update_s paramUpdate;
 
-	param_get(_paramHandle.maxAirSpeed, &_params.maxAirSpeed);
-}
+	orb_check(_parameterSub, &updated);
 
+	if (updated) {
+		orb_copy(ORB_ID(parameter_update), _parameterSub, &paramUpdate);
+	}
+
+	if (updated || force) {
+		param_get(_paramHandle.maxAirSpeed, &_params.maxAirSpeed);
+	}
 }

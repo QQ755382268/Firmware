@@ -302,18 +302,19 @@ PARAM_DEFINE_FLOAT(INAV_FLOW_DIST_X, 0.0f);
 PARAM_DEFINE_FLOAT(INAV_FLOW_DIST_Y, 0.0f);
 
 /**
- * Mo-cap
+ * Disable mocap (set 0 if using fake gps)
  *
- * Set to 0 if using fake GPS
+ * Disable mocap
  *
- * @value 0 Mo-cap enabled
- * @value 1 Mo-cap disabled
+ * @boolean
  * @group Position Estimator INAV
  */
 PARAM_DEFINE_FLOAT(INAV_DISAB_MOCAP, 0);
 
 /**
- * LIDAR for altitude estimation
+ * Enable LIDAR for altitude estimation
+ *
+ * Enable LIDAR for altitude estimation
  *
  * @boolean
  * @group Position Estimator INAV
@@ -343,6 +344,18 @@ PARAM_DEFINE_FLOAT(INAV_LIDAR_OFF, 0.0f);
  * @group Position Estimator INAV
  */
 PARAM_DEFINE_INT32(CBRK_NO_VISION, 0);
+
+/**
+ * INAV enabled
+ *
+ * If set to 1, use INAV for position estimation.
+ * Else the system uses the combined attitude / position
+ * filter framework.
+ *
+ * @boolean
+ * @group Position Estimator INAV
+ */
+PARAM_DEFINE_INT32(INAV_ENABLED, 1);
 
 int inav_parameters_init(struct position_estimator_inav_param_handles *h)
 {

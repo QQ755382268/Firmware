@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
-* @file tailsitter.h
+* @file tiltrotor.h
 *
 * @author Roman Bapst 		<bapstroman@gmail.com>
 * @author David Vorsin     <davidvorsin@gmail.com>

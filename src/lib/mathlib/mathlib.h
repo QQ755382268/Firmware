@@ -37,9 +37,9 @@
  * Common header for mathlib exports.
  */
 
-#pragma once
-
 #ifdef __cplusplus
+
+#pragma once
 
 #include "math/Vector.hpp"
 #include "math/Matrix.hpp"

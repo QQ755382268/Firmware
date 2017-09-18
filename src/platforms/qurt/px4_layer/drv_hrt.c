@@ -42,7 +42,6 @@
 #include <drivers/drv_hrt.h>
 #include <semaphore.h>
 #include <time.h>
-#include <sys/time.h>
 #include <dspal_time.h>
 #include <string.h>
 #include <stdio.h>
@@ -64,6 +63,8 @@ static void		hrt_call_reschedule(void);
 static sem_t 	_hrt_lock;
 static struct work_s	_hrt_work;
 
+#include <time.h>
+#include <sys/time.h>
 #define CLOCK_REALTIME 0
 
 #ifndef CLOCK_MONOTONIC

@@ -66,8 +66,6 @@ public:
 		_TASmin(3.0f),
 		_TAS_dem(0.0f),
 		_TAS_dem_last(0.0f),
-		_EAS_dem(0.0f),
-		_hgt_dem(0.0f),
 		_hgt_dem_in_old(0.0f),
 		_hgt_dem_adj(0.0f),
 		_hgt_dem_adj_last(0.0f),
@@ -456,7 +454,7 @@ private:
 	void _update_pitch(void);
 
 	// Initialise states and variables
-	void _initialise_states(float pitch, float throttle_cruise, float baro_altitude, float ptchMinCO_rad, float EAS2TAS);
+	void _initialise_states(float pitch, float throttle_cruise, float baro_altitude, float ptchMinCO_rad);
 
 	// Calculate specific total energy rate limits
 	void _update_STE_rate_lim(void);

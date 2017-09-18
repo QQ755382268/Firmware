@@ -44,9 +44,7 @@
 #define MATRIX_HPP
 
 #include <stdio.h>
-#include <cmath>
-
-#include "Vector.hpp"	// Vector and eigen_matrix_instance
+#include <math.h>
 
 #include "matrix/math.hpp"
 #include <platforms/px4_defines.h>
@@ -307,7 +305,7 @@ public:
 	 * transpose the matrix
 	 */
 	Matrix<N, M> transposed(void) const {
-		matrix::Matrix<float, M, N> Me(this->arm_mat.pData);
+		matrix::Matrix<float, N, M> Me(this->arm_mat.pData);
 		Matrix<N, M> res(Me.transpose().data());
 		return res;
 	}

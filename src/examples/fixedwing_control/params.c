@@ -57,14 +57,6 @@ PARAM_DEFINE_FLOAT(EXFW_ROLL_P, 0.2f);
  */
 PARAM_DEFINE_FLOAT(EXFW_PITCH_P, 0.2f);
 
-int parameters_init(struct param_handles *h);
-
-/**
- * Update all parameters
- *
- */
-int parameters_update(const struct param_handles *h, struct params *p);
-
 int parameters_init(struct param_handles *h)
 {
 	/* PID parameters */
@@ -72,7 +64,7 @@ int parameters_init(struct param_handles *h)
 	h->roll_p 	=	param_find("EXFW_ROLL_P");
 	h->pitch_p 	=	param_find("EXFW_PITCH_P");
 
-	return 0;
+	return OK;
 }
 
 int parameters_update(const struct param_handles *h, struct params *p)
@@ -81,5 +73,5 @@ int parameters_update(const struct param_handles *h, struct params *p)
 	param_get(h->roll_p, &(p->roll_p));
 	param_get(h->pitch_p, &(p->pitch_p));
 
-	return 0;
+	return OK;
 }

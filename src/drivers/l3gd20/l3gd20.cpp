@@ -40,7 +40,6 @@
  */
 
 #include <px4_config.h>
-#include <px4_defines.h>
 
 #include <sys/types.h>
 #include <stdint.h>
@@ -74,6 +73,12 @@
 #include <lib/conversion/rotation.h>
 
 #define L3GD20_DEVICE_PATH "/dev/l3gd20"
+
+/* oddly, ERROR is not defined for c++ */
+#ifdef ERROR
+# undef ERROR
+#endif
+static const int ERROR = -1;
 
 /* Orientation on board */
 #define SENSOR_BOARD_ROTATION_000_DEG	0
@@ -421,9 +426,9 @@ L3GD20::L3GD20(int bus, const char *path, spi_dev_e device, enum Rotation rotati
 	_orientation(SENSOR_BOARD_ROTATION_DEFAULT),
 	_read(0),
 	_sample_perf(perf_alloc(PC_ELAPSED, "l3gd20_read")),
-	_errors(perf_alloc(PC_COUNT, "l3gd20_err")),
-	_bad_registers(perf_alloc(PC_COUNT, "l3gd20_bad_reg")),
-	_duplicates(perf_alloc(PC_COUNT, "l3gd20_dupe")),
+	_errors(perf_alloc(PC_COUNT, "l3gd20_errors")),
+	_bad_registers(perf_alloc(PC_COUNT, "l3gd20_bad_registers")),
+	_duplicates(perf_alloc(PC_COUNT, "l3gd20_duplicates")),
 	_register_wait(0),
 	_gyro_filter_x(L3GD20_DEFAULT_RATE, L3GD20_DEFAULT_FILTER_FREQ),
 	_gyro_filter_y(L3GD20_DEFAULT_RATE, L3GD20_DEFAULT_FILTER_FREQ),
@@ -471,7 +476,7 @@ L3GD20::~L3GD20()
 int
 L3GD20::init()
 {
-	int ret = PX4_ERROR;
+	int ret = ERROR;
 
 	/* do SPI init (and probe) first */
 	if (SPI::init() != OK) {
@@ -661,14 +666,14 @@ L3GD20::ioctl(struct file *filp, int cmd, unsigned long arg)
 				return -EINVAL;
 			}
 
-			irqstate_t flags = px4_enter_critical_section();
+			irqstate_t flags = irqsave();
 
 			if (!_reports->resize(arg)) {
-				px4_leave_critical_section(flags);
+				irqrestore(flags);
 				return -ENOMEM;
 			}
 
-			px4_leave_critical_section(flags);
+			irqrestore(flags);
 
 			return OK;
 		}
@@ -1205,7 +1210,7 @@ start(bool external_bus, enum Rotation rotation)
 
 	/* create the driver */
 	if (external_bus) {
-#if defined(PX4_SPI_BUS_EXT) && defined(PX4_SPIDEV_EXT_GYRO)
+#ifdef PX4_SPI_BUS_EXT
 		g_dev = new L3GD20(PX4_SPI_BUS_EXT, L3GD20_DEVICE_PATH, (spi_dev_e)PX4_SPIDEV_EXT_GYRO, rotation);
 #else
 		errx(0, "External SPI not available");

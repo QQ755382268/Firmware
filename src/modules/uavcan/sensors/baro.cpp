@@ -35,7 +35,6 @@
  * @author Pavel Kirienko <pavel.kirienko@gmail.com>
  */
 
-#include <drivers/drv_hrt.h>
 #include "baro.hpp"
 #include <cmath>
 
@@ -124,14 +123,14 @@ int UavcanBarometerBridge::ioctl(struct file *filp, int cmd, unsigned long arg)
 				return -EINVAL;
 			}
 
-			irqstate_t flags = px4_enter_critical_section();
+			irqstate_t flags = irqsave();
 
 			if (!_reports.resize(arg)) {
-				px4_leave_critical_section(flags);
+				irqrestore(flags);
 				return -ENOMEM;
 			}
 
-			px4_leave_critical_section(flags);
+			irqrestore(flags);
 
 			return OK;
 		}

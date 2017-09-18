@@ -52,7 +52,9 @@
 #include <drivers/drv_pwm_output.h>
 #include <systemlib/err.h>
 
-#include "tests_main.h"
+//#include <nuttx/spi.h>
+
+#include "tests.h"
 
 int test_servo(int argc, char *argv[])
 {

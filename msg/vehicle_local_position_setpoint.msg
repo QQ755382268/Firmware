@@ -1,5 +1,6 @@
 # Local position setpoint in NED frame
 
+uint64 timestamp	# timestamp of the setpoint
 float32 x		# in meters NED
 float32 y		# in meters NED
 float32 z		# in meters NED

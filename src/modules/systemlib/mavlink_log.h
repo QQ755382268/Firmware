@@ -73,7 +73,23 @@ __EXPORT void mavlink_vasprintf(int severity, orb_advert_t *mavlink_log_pub, con
  */
 
 /**
- * Send a mavlink info message (not printed to console).
+ * Send a mavlink emergency message.
+ *
+ * @param _pub		Pointer to the uORB advert;
+ * @param _text		The text to log;
+ */
+#define mavlink_log_emergency(_pub, _text, ...)	mavlink_vasprintf(_MSG_PRIO_EMERGENCY, _pub, _text, ##__VA_ARGS__);
+
+/**
+ * Send a mavlink critical message.
+ *
+ * @param _pub		Pointer to the uORB advert;
+ * @param _text		The text to log;
+ */
+#define mavlink_log_critical(_pub, _text, ...)	mavlink_vasprintf(_MSG_PRIO_CRITICAL, _pub, _text, ##__VA_ARGS__);
+
+/**
+ * Send a mavlink info message.
  *
  * @param _pub		Pointer to the uORB advert;
  * @param _text		The text to log;
@@ -86,9 +102,9 @@ __EXPORT void mavlink_vasprintf(int severity, orb_advert_t *mavlink_log_pub, con
  * @param _pub		Pointer to the uORB advert;
  * @param _text		The text to log;
  */
-#define mavlink_log_emergency(_pub, _text, ...) \
+#define mavlink_and_console_log_emergency(_pub, _text, ...) \
 	do { \
-		mavlink_vasprintf(_MSG_PRIO_EMERGENCY, _pub, _text, ##__VA_ARGS__); \
+		mavlink_log_emergency(_pub, _text, ##__VA_ARGS__); \
 		PX4_ERR(_text, ##__VA_ARGS__); \
 	} while(0);
 
@@ -98,9 +114,9 @@ __EXPORT void mavlink_vasprintf(int severity, orb_advert_t *mavlink_log_pub, con
  * @param _pub		Pointer to the uORB advert;
  * @param _text		The text to log;
  */
-#define mavlink_log_critical(_pub, _text, ...) \
+#define mavlink_and_console_log_critical(_pub, _text, ...) \
 	do { \
-		mavlink_vasprintf(_MSG_PRIO_CRITICAL, _pub, _text, ##__VA_ARGS__); \
+		mavlink_log_critical(_pub, _text, ##__VA_ARGS__); \
 		PX4_WARN(_text, ##__VA_ARGS__); \
 	} while(0);
 

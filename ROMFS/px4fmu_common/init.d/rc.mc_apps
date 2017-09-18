@@ -4,35 +4,36 @@
 # att & pos estimator, att & pos control.
 #
 
-
-#---------------------------------------
-# Estimator group selction
-#
-# INAV (deprecated)
-if param compare SYS_MC_EST_GROUP 0
-then
-	echo "ERROR [init] Estimator INAV deprecated. Using LPE"
-	param set SYS_MC_EST_GROUP 1
-	param save
-fi
-
-# LPE
-if param compare SYS_MC_EST_GROUP 1
+# The system is defaulting to INAV_ENABLED = 1
+# but users can alternatively try the EKF-based
+# filter by setting INAV_ENABLED = 0
+if param compare INAV_ENABLED 1
 then
 	attitude_estimator_q start
-	local_position_estimator start
+	position_estimator_inav start
+else
+	if param compare LPE_ENABLED 1
+	then
+		attitude_estimator_q start
+		local_position_estimator start
+	else
+		ekf2 start
+	fi
 fi
 
-# EKF
-if param compare SYS_MC_EST_GROUP 2
+if mc_att_control start
 then
-	ekf2 start
+else
+	# try the multiplatform version
+	mc_att_control_m start
 fi
-#---------------------------------------
 
-mc_att_control start
-
-mc_pos_control start
+if mc_pos_control start
+then
+else
+	# try the multiplatform version
+	mc_pos_control_m start
+fi
 
 #
 # Start Land Detector

@@ -30,12 +30,15 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 #############################################################################
+set(MODULE_CFLAGS)
+if (${OS} STREQUAL "nuttx")
+	list(APPEND MODULE_CFLAGS -Wframe-larger-than=4000)
+endif()
 px4_add_module(
 	MODULE modules__ekf2_replay
 	MAIN ekf2_replay
-	COMPILE_FLAGS
-	STACK_MAIN 1000
-	STACK_MAX 4000
+	COMPILE_FLAGS ${MODULE_CFLAGS}
+	STACK 1000
 	SRCS
 		ekf2_replay_main.cpp
 	DEPENDS

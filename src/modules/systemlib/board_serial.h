@@ -42,8 +42,6 @@
 
 #pragma once
 
-#include <stdint.h>	// uint8_t
-
 __BEGIN_DECLS
 
 __EXPORT int get_board_serial(uint8_t *serialid);

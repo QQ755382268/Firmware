@@ -108,8 +108,8 @@ __EXPORT void px4_systemreset(bool to_bootloader) noreturn_function;
 
 /** Starts a task and performs any specific accounting, scheduler setup, etc. */
 __EXPORT px4_task_t px4_task_spawn_cmd(const char *name,
-				       int scheduler,
 				       int priority,
+				       int scheduler,
 				       int stack_size,
 				       px4_main_t entry,
 				       char *const argv[]);
@@ -131,11 +131,8 @@ __EXPORT bool px4_task_is_running(const char *taskname);
 
 #ifdef __PX4_POSIX
 /** set process (and thread) options */
-__EXPORT int px4_prctl(int option, const char *arg2, px4_task_t pid);
+__EXPORT int px4_prctl(int option, const char *arg2, unsigned pid);
 #endif
-
-/** return the name of the current task */
-__EXPORT const char *px4_get_taskname(void);
 
 __END_DECLS
 
